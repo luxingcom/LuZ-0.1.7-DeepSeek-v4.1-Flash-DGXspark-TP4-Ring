@@ -1,0 +1,40 @@
+# Prompt-rate matrix (SD-1)
+
+Input size is token-exact and the prompt carries a fresh nonce, so no request is served from the radix cache. The output budget is forced (`min_new_tokens = max_new_tokens`, `ignore_eos`), so every stream delivers the full 1,024 tokens and short-stream tails cannot inflate per-stream rates. Synthetic repeated notes; **not a quality test**.
+
+**The prefill column scales only for `input <= CHUNKED_PREFILL_SIZE`** (4096 tokens here). Above it a request is chunked and takes the whole step's prefill budget, so it is prefilled one at a time: aggregate prompt-rate collapses to the single-stream chunked rate and TTFT grows with queue position. `Prefills/step (pred)` is `min(C, floor(CHUNK / input))`; `Engine running/queue` are the engine's own counters sampled once a second during the cell, so the prediction can be checked rather than believed.
+
+`TTFT first/last s` bracket the wave's queue position -- when the median sits between two values an order of magnitude apart it is describing the queue, not the engine. `median decode` is SD-1: per-stream `(ct-1)/(tLast-tFirst)`. `window decode` is the older 129..641 measure, recovered from the retained event log. `agg prefill` = sum(prompt_tokens) / (last first-token - first send).
+
+| Input tokens | C | Prefills/step (pred) | Prefill tok/s (agg) | TTFT first s | Median TTFT s | TTFT last s | Median decode tok/s/req | Window decode tok/s/req | Total decode tok/s (union) | Engine running (min/med/max) | Engine queue (min/med/max) | OK |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|---:|
+| 512 | 1 | 1 | 1064.20 | 0.48 | 0.48 | 0.48 | 62.03 | 61.88 | 62.00 | 1/1/1 | 0/0/0 | 1/1 |
+| 512 | 2 | 2 | 1886.90 | 0.54 | 0.54 | 0.54 | 53.12 | 55.29 | 104.40 | 1/2/2 | 0/0/0 | 2/2 |
+| 512 | 4 | 4 | 1406.70 | 1.46 | 1.45 | 1.46 | 39.86 | 40.10 | 156.50 | 2/4/4 | 0/0/0 | 4/4 |
+| 512 | 8 | 8 | 2858.80 | 1.43 | 1.43 | 1.43 | 24.17 | 24.52 | 191.00 | 1/8/8 | 0/0/0 | 8/8 |
+| 512 | 16 | 8 | 1699.50 | 4.29 | 4.31 | 4.81 | 20.89 | 20.75 | 320.20 | 8/16/16 | 0/0/0 | 16/16 |
+| 2048 | 1 | 1 | 2493.70 | 0.82 | 0.82 | 0.82 | 62.90 | 59.69 | 62.90 | 1/1/1 | 0/0/0 | 1/1 |
+| 2048 | 2 | 2 | 1647.40 | 2.49 | 2.49 | 2.49 | 51.76 | 51.46 | 100.30 | 1/2/2 | 0/0/0 | 2/2 |
+| 2048 | 4 | 2 | 1931.70 | 4.14 | 4.19 | 4.24 | 37.91 | 36.70 | 141.70 | 1/4/4 | 0/0/0 | 4/4 |
+| 2048 | 8 | 2 | 2407.70 | 3.25 | 6.03 | 6.80 | 23.67 | 23.85 | 174.00 | 1/8/8 | 0/0/4 | 8/8 |
+| 2048 | 16 | 2 | 2717.90 | 4.14 | 8.49 | 12.05 | 19.53 | 20.09 | 282.40 | 1/16/16 | 0/0/12 | 16/16 |
+| 8192 | 1 | 1 | 3327.20 | 2.46 | 2.46 | 2.46 | 59.67 | 55.22 | 59.70 | 1/1/10 | 0/0/0 | 1/1 |
+| 8192 | 2 | 1 | 2922.20 | 3.62 | 4.62 | 5.61 | 46.32 | 48.87 | 85.80 | 1/2/2 | 0/0/1 | 2/2 |
+| 8192 | 4 | 1 | 2209.00 | 4.20 | 10.36 | 14.83 | 33.28 | 40.26 | 108.70 | 1/4/4 | 0/0/3 | 4/4 |
+| 8192 | 8 | 1 | 2070.70 | 4.63 | 18.35 | 31.64 | 18.44 | 24.32 | 116.90 | 1/8/8 | 0/0/7 | 8/8 |
+| 8192 | 16 | 1 | 2001.50 | 4.85 | 36.49 | 65.47 | 12.93 | 19.81 | 144.50 | 2/14/16 | 0/0/15 | 16/16 |
+| 32768 | 1 | 1 | 2598.60 | 12.61 | 12.61 | 12.61 | 60.52 | 56.19 | 60.50 | 1/1/2 | 0/0/0 | 1/1 |
+| 32768 | 2 | 1 | 2352.30 | 15.07 | 21.47 | 27.86 | 40.11 | 50.86 | 60.90 | 1/2/2 | 0/0/1 | 2/2 |
+| 32768 | 4 | 1 | 1872.00 | 18.02 | 45.13 | 70.01 | 20.05 | 36.26 | 51.20 | 1/3/4 | 0/1/3 | 4/4 |
+| 32768 | 8 | 1 | 2006.70 | 18.14 | 72.79 | 130.62 | 9.94 | 24.10 | 51.60 | 2/7/9 | 0/2/7 | 8/8 |
+| 32768 | 16 | 1 | 1967.80 | 17.14 | 144.42 | 266.38 | 5.96 | 20.10 | 54.20 | 2/11/16 | 0/6/15 | 16/16 |
+| 131072 | 1 | 1 | 1717.60 | 76.31 | 76.31 | 76.31 | 66.03 | 69.87 | 66.00 | 1/1/16 | 0/0/0 | 1/1 |
+| 131072 | 2 | 1 | 1666.40 | 79.74 | 118.52 | 157.30 | 29.22 | 49.59 | 20.60 | 1/2/3 | 0/0/1 | 2/2 |
+| 131072 | 4 | 1 | 1697.60 | 78.37 | 196.98 | 308.81 | 7.91 | 37.83 | 15.90 | 0/2/4 | 0/1/3 | 4/4 |
+| 131072 | 8 | 1 | 1720.70 | 80.74 | 346.26 | 609.27 | 3.38 | 23.89 | 14.30 | 0/4/8 | 0/3/7 | 8/8 |
+| 131072 | 16 | 1 | 1694.40 | 80.48 | 663.86 | 1237.52 | 1.64 | 19.71 | 13.50 | 0/8/16 | 0/11/15 | 16/16 |
+| 524288 | 1 | 1 | 1326.80 | 395.15 | 395.15 | 395.15 | 65.11 | 68.54 | 65.10 | 0/0/6 | 0/0/0 | 1/1 |
+| 524288 | 2 | 1 | 1275.00 | 412.93 | 617.68 | 822.42 | 24.12 | 43.94 | 4.70 | 0/1/2 | 0/1/5 | 2/2 |
+| 524288 | 4 | 1 | 1332.20 | 390.31 | 980.12 | 1574.08 | 1.81 | 31.88 | 3.40 | 0/2/4 | 0/7/10 | 4/4 |
+| 524288 | 8 | 1 | 1322.70 | 403.08 | 1794.81 | 3170.88 | 0.73 | 20.30 | 2.90 | 0/4/8 | 0/3/7 | 8/8 |
+| 524288 | 16 | 1 | 1408.50 | 387.96 | 3190.08 | 5955.17 | 0.36 | 15.19 | 2.90 | 0/7/16 | 0/9/17 | 16/16 |

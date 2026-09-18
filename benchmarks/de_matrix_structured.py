@@ -2,10 +2,11 @@
 # -*- coding: utf-8 -*-
 """de_matrix_structured.py -- DE matrix with STRUCTURED (schema-constrained) output.
 
-This is the harness behind `data/de-structured-20260918/` (10 cells: coding/json
-x 5 concurrencies, 3 waves per cell) and therefore behind section 4 of
-`docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md` and the
-structured-vs-free-form comparison in section 5.
+This harness is what measured **guided-decoding cost** (coding/json x 5
+concurrencies, 3 waves per cell) against the free-form harness above. It is the answer to
+a different question from "which output shape is fastest" -- `grammar_ab.py` re-measures
+that A/B under SD-1 and publishes it in FINAL-METRICS §5.1. Retained as-is, with its
+archive generation removed from `data/`.
 
 Method
 ------

@@ -28,8 +28,9 @@ requests failed before reaching the model. Among the 108 requests that did compl
 no regression on the answers that were actually produced.
 
 Reporting only `107/108` would overstate the result; reporting only `0.535` without
-the `err=92` context would understate it. Both are given above. This is errata row 6
-in [`../../docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md`](../../docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md) §10.
+the `err=92` context would understate it. **Both are given above, always together.**
+The same two-row presentation is in
+[`../../docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md`](../../docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md) §9.
 
 ## Redaction
 

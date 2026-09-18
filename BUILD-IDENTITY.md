@@ -1,7 +1,5 @@
 # Build identity — what the fleet actually runs
 
-**Recorded 2026-09-18** from the live deployment (rev.2 — supersedes the 2026-09-13
-record, which described the pre-`v7` image and a different SGLang commit).
 Use this to tell whether *your* build is the same one the `[measured]` numbers in
 `.env.tp4.example`, the READMEs and `docs/03-final-metrics/` came from.
 
@@ -22,17 +20,16 @@ Use this to tell whether *your* build is the same one the `[measured]` numbers i
 | Registry digest | **`<none>`** for both — the overlay is built locally and shipped by `docker save` / `docker load`, never pushed to a registry, so `docker images --digests` shows none either |
 
 **The reported image ID is *not* expected to match across nodes — but the content is.**
-Measured on 2026-09-18: the head reports `03587ce9…` and the workers report
-`9e1036bc…`, yet on all four nodes the rootfs layer list, the `Config` section, the
-creation timestamp and every `org.dsv41.*` label are **byte-hash-identical**
-(`.Config` → `77799e6ce3de5824`, `.RootFS` → `cdd980943dfe9e6b`, `.Created` →
-`0203e92cacf2a896` on all four).
+Measured: the head reports `03587ce9…` and the workers report `9e1036bc…`, yet on all
+four nodes the rootfs layer list, the `Config` section, the creation timestamp and every
+`org.dsv41.*` label are **byte-hash-identical** (`.Config` → `77799e6ce3de5824`,
+`.RootFS` → `cdd980943dfe9e6b`, `.Created` → `0203e92cacf2a896` on all four).
 
 The mechanism is a **storage-driver split plus a two-object DAG, not a content
 difference**. The head runs the containerd `overlayfs` snapshotter while the workers run
-classic `overlay2` (this is also recorded in `start.sh:772-776`), and — measured against
-the release archive itself on 2026-09-18 — the two IDs are **different objects inside the
-same archive**, each sha256-consistent with its own bytes:
+classic `overlay2` (also recorded in `start.sh:772-776`), and — measured against the
+release archive itself — the two IDs are **different objects inside the same archive**,
+each sha256-consistent with its own bytes:
 
 | reported `.Id` | what it is in the archive | size |
 |---|---|---|
@@ -42,15 +39,14 @@ same archive**, each sha256-consistent with its own bytes:
 Both are reachable from `index.json` in one graph; neither describes content. The diffID
 list does. Verify content, not IDs.
 
-> ⚠️ **Do not use layer count or image ID as an acceptance criterion.** This fleet has
-> previously carried two structural forms of the same content, and a distinct
-> rollback-anchor tag (`dsv41-4x-spark:local`) that exists in **three different
-> contents across four nodes**. Compare the content identity and the fingerprints below instead.
+> ⚠️ **Do not use layer count or image ID as an acceptance criterion.** This fleet also
+> carries a rollback-anchor tag (`dsv41-4x-spark:local`) whose **tag is reused across
+> builds — three different contents across four nodes**. Compare the content identity and
+> the fingerprints below instead.
 
-**Legacy images still present on the hosts, NOT current:** `dsv41-4x-spark:local`
-(tag reused across builds — three different contents fleet-wide), `dsv41-4x-spark:flat`
-(absent on node 02), `lmsysorg/sglang:dev-dsv41` (base), and the `dsv41-sglang-optimized:v1…v6`
-lineage.
+**Other images present on the hosts, NOT current:** `dsv41-4x-spark:local` (rollback
+anchor, tag reused across builds), `dsv41-4x-spark:flat` (absent on node 02),
+`lmsysorg/sglang:dev-dsv41` (base), and the `dsv41-sglang-optimized:v1…v6` lineage.
 
 ---
 
@@ -63,11 +59,11 @@ docker run --rm --entrypoint sh dsv41-sglang-optimized:v7 -c \
           /sgl-workspace/sglang/python/sglang/kernels/ops/attention/flash_mla_sm120.py'
 ```
 
-| file | md5 (v7) | changed vs 2026-09-13 record? |
-|---|---|---|
-| `/opt/dsv41/boot.py` | `a7381d95d1560a3b2363a34d222df064` | **yes** (was `74025c52d5011316a5fad6a32243c279`) |
-| `/opt/dsv41/adapter/librow_store.so` | `1f820aef687d0f9685c0e4b51585ece6` | no |
-| `…/kernels/ops/attention/flash_mla_sm120.py` | `d91b0cda319e8a9b57e73e71020fb7bb` | no |
+| file | md5 (v7) |
+|---|---|
+| `/opt/dsv41/boot.py` | `a7381d95d1560a3b2363a34d222df064` |
+| `/opt/dsv41/adapter/librow_store.so` | `1f820aef687d0f9685c0e4b51585ece6` |
+| `…/kernels/ops/attention/flash_mla_sm120.py` | `d91b0cda319e8a9b57e73e71020fb7bb` |
 
 ### How to compute the content identity
 
@@ -78,36 +74,32 @@ This is the **same formula `start.sh` uses** (`IMGID_TPL` at `start.sh:777` +
 ```bash
 docker image inspect -f '{{join .RootFS.Layers " "}}' dsv41-sglang-optimized:v7 \
   | sha256sum | cut -c1-16
-# 2026-09-18, measured on all four nodes: 4ebef21b6aedbd70
+# measured on all four nodes: 4ebef21b6aedbd70
 ```
 
 > ⚠️ **The formula is byte-exact — publish it together with the value.** `docker image
 > inspect -f` emits the joined layer list **with a trailing newline**, and that newline is
 > part of the hashed input. Hashing the *same* 123-entry list under five different
-> serializations yields five different 16-hex strings, and all five have appeared in this
-> repo's history labelled "the image identity". They were re-derived **offline from the
-> release archive** on 2026-09-18 by `scripts/verify_release_artifact.py`:
+> serializations yields five different 16-hex strings, all of them correct hashes of a
+> real serialization of the real layer list:
 >
-> | hashed byte stream | sha256[:16] | where it was published |
-> |---|---|---|
-> | space-joined + trailing `\n` ← **authoritative** (`{{join .RootFS.Layers " "}}` piped to `sha256sum`) | **`4ebef21b6aedbd70`** | `start.sh` `IMGID_TPL`, and this file |
-> | space-joined, no trailing newline | `bb7c2d4b38af0514` | a probe variant |
-> | newline-joined, no trailing newline | `c8751accc458138c` | BUILD-IDENTITY rev.1 |
-> | newline-joined + trailing newline | `38bbe8265458f328` | `start.sh` preflight comment (original) |
-> | newline-joined + two trailing newlines | `0050285e87c6f408` | BUILD-IDENTITY rev.1's stated formula |
+> | hashed byte stream | sha256[:16] |
+> |---|---|
+> | space-joined + trailing `\n` ← **authoritative** (`{{join .RootFS.Layers " "}}` piped to `sha256sum`) | **`4ebef21b6aedbd70`** |
+> | space-joined, no trailing newline | `bb7c2d4b38af0514` |
+> | newline-joined, no trailing newline | `c8751accc458138c` |
+> | newline-joined + trailing newline | `38bbe8265458f328` |
+> | newline-joined + two trailing newlines | `0050285e87c6f408` |
 >
-> **The lesson is not "someone hashed the wrong thing".** Every value above is a correct
-> hash of a real serialization of the real layer list — including the two this repo
-> previously (and wrongly) called ghosts. The defect was publishing a hash without its
-> byte-exact pipeline, which made four different quantities look like four competing
-> claims about one quantity. Only `4ebef21b6aedbd70` is asserted by production code, so
-> only it is *the* identity.
+> All five were re-derived **offline from the release archive** by
+> `scripts/verify_release_artifact.py`. **The defect to avoid is not "hashing the wrong
+> thing" — it is publishing a hash without its byte-exact pipeline**, which makes several
+> different quantities look like competing claims about one quantity. Only
+> `4ebef21b6aedbd70` is asserted by production code, so only it is *the* identity.
 
 > ⚠️ **Empty-input trap (this pipeline fails *open*, not closed).** If the image is
 > absent, `docker image inspect` writes nothing to stdout and exits non-zero — but the
-> pipeline still prints a **well-formed-looking** hash. Measured constants
-> (independently recomputed: `sha256(b"")` = `e3b0c44298fc1c14`,
-> `sha256(b"\n")` = `01ba4719c80b6fe9`):
+> pipeline still prints a **well-formed-looking** hash:
 >
 > | input | sha256 (first 16) |
 > |---|---|
@@ -117,19 +109,16 @@ docker image inspect -f '{{join .RootFS.Layers " "}}' dsv41-sglang-optimized:v7 
 > So `01ba4719c80b6fe9` is what a **missing** image looks like — it is *not* an identity.
 > Any consumer must (a) assert image existence **before** hashing, and (b) blacklist
 > both constants. `start.sh` does both (`image_preflight()` step ③); the comment at
-> `start.sh:814-819` records why.
+> `start.sh:814-819` records why. Note the same constant also appears when
+> `docker image inspect -f` is asked for an empty field: **one value, two sources.**
 
-> ⚠️ **One value is still an orphan.** `e541746d26e31a3f` — published in the README as
-> "layers-json sha256", "recorded at export time" — is reproduced by **none** of the 32
-> candidate serializations tested against the release archive: not any serialization of
-> the diffID list, not the image config blob, not either manifest, not `index.json`, not
-> the compressed-layer list. No production script asserts it either. Its most likely
-> origin is a superseded image revision from **before** the redaction rebuild (the
-> release-gate record's item **R1**), but that is a hypothesis, not a measurement.
-> Treat it as **unverifiable**, not as a wrong number — and never as an acceptance
-> criterion. `c8751accc458138c` and `38bbe8265458f328`, by contrast, are no longer
-> orphans: the table above reproduces both. See
-> [docs/ERRATA-2026-09-18.md](docs/ERRATA-2026-09-18.md).
+> ⚠️ **One orphan.** `e541746d26e31a3f` — carried in this repo as "layers-json sha256" —
+> is reproduced by **none** of the 32 candidate serializations tested against the release
+> archive: not any serialization of the diffID list, not the image config blob, not either
+> manifest, not `index.json`, not the compressed-layer list. No production script asserts
+> it either. Most likely it belongs to an image revision from **before** the redaction
+> rebuild. Treat it as **unverifiable**, not as a wrong number — and never as an
+> acceptance criterion.
 
 ### Additional build anchors carried by the image
 
@@ -164,10 +153,9 @@ overlay set than this checkout".
 | MoE runner | `flashinfer_mxfp4` |
 | FP8 GEMM runner | `flashinfer_cutlass` |
 
-> The 2026-09-13 record named SGLang commit **`e087e662b`** for an earlier image
-> (`dsv41-4x-spark:local`). If you are reading a document that still says
-> `e087e662b`, it is describing that earlier build — the kernels are *not*
-> interchangeable across the two commits.
+> The local rollback-anchor image `dsv41-4x-spark:local` was built from SGLang commit
+> **`e087e662b`**. Kernels are **not** interchangeable between the two commits; if a
+> document names `e087e662b` it is describing that earlier build.
 
 **Model**: `deepseek-ai/DeepSeek-V4.1-Flash` at `/models/DeepSeek-V4.1-Flash` inside the
 image. From its `config.json`: 40 layers, hidden 5120, `num_attention_heads` 64,
@@ -203,14 +191,19 @@ collectives) rather than by skipping the tree transport connect.
 > fatally over-committed run. The only precise device-side channel is
 > `nvidia-smi --query-compute-apps`. Do not conclude "no OOM happened" from
 > cgroup counters.
+>
+> A second consequence, for measurement: because the pool is shared, `eff_free`
+> (`MemFree + Cached + SReclaimable − Shmem`) sits at **6.8–9.9 GiB while the engine is
+> resident** and stays flat there. The 110 GiB figure the launch gate (`oom_gate pre -t
+> 110`) uses is a **pre-launch admission** threshold, not a steady-state health line.
+> Comparing a steady-state reading against it produces false alarms in both directions.
 
 ---
 
 ## Runtime configuration actually in force
 
-Full launch line, read out of the running container's `/proc/<pid>/cmdline` on
-2026-09-18 (flag order preserved; the head's real ring address is shown as
-`<head-ring-ip>`):
+Full launch line, read out of the running container's `/proc/<pid>/cmdline` (flag order
+preserved; the head's real ring address is shown as `<head-ring-ip>`):
 
 ```
 --model-path /models/DeepSeek-V4.1-Flash  --served-model-name deepseek-v4.1-flash
@@ -229,7 +222,8 @@ Full launch line, read out of the running container's `/proc/<pid>/cmdline` on
 ```
 
 `--served-model-name` is the **engine-side** name. Do not confuse it with the names
-exposed by the client-facing gateway — see the note on names below.
+exposed by the client-facing gateway — four distinct name strings are in play (image tag,
+gateway alias, engine self-report, upstream probe) and they are not interchangeable.
 
 Resulting engine state, as reported by the engine on startup:
 `max_total_num_tokens=9600000, context_len=600000, max_running_requests=16`,
@@ -247,6 +241,7 @@ Notable environment gates (full list in `.env.tp4.example`):
 | `SGLANG_DSV4_KV_LAYOUT` | `fork-v4-fp4` |
 | `SGLANG_RAGGED_VERIFY_MODE` | `static` |
 | `NCCL_ALGO` / `NCCL_IB_GID_INDEX` | `RING` / `3` |
+| `NCCL_MIN_NCHANNELS` / `NCCL_MAX_NCHANNELS` | `4` / `4` |
 
 ---
 
@@ -256,7 +251,7 @@ Notable environment gates (full list in `.env.tp4.example`):
 |---|---|
 | File | `LuZ-0.1.7-DSV41F-image.tar.zst` |
 | Size | 14,463,467,578 bytes (13.5 GiB) |
-| MD5 | `10307040cd70ab23436bf34eee829d24` — recomputed over the local artifact copy 2026-09-18; byte count and hash both match |
+| MD5 | `10307040cd70ab23436bf34eee829d24` — recomputed over the local artifact copy; byte count and hash both match |
 | Produced by | `docker save dsv41-sglang-optimized:v7 \| zstd -T0` on node 01. Because that node uses the containerd image store, the result is an **OCI layout** (`oci-layout`, `index.json`, `manifest.json`, `blobs/sha256/*`), not the plain `<layer>/layer.tar` form |
 | Tar anatomy | 128 members = **123 blobs** + `index.json` + `manifest.json` + `oci-layout` + 2 directory entries. Payload 14,686,175,317 bytes (uncompressed) |
 | Internal integrity | **all 123 blobs verified**: `sha256(bytes) == its own filename` ⇒ the archive is a self-consistent content-addressed store, nothing truncated |
@@ -265,9 +260,7 @@ Notable environment gates (full list in `.env.tp4.example`):
 | Layer anatomy | 123 diffIDs, **117 distinct**; `sha256:5f70bf18…` (an empty tar = 1024 NUL bytes) appears **7×** ⇒ 6 of the 123 layers carry no content. The config's `history` marks 108 of its 231 steps `empty_layer` |
 | **Offline reproduction** | the archive **reproduces content identity `4ebef21b6aedbd70` with no cluster, no docker daemon and no GPU** — see `scripts/verify_release_artifact.py` |
 
-The last row closes what used to be the weakest claim in this file. Earlier revisions said
-the released identity could not be re-derived from the repo alone; it now can, from the
-artifact alone:
+The identity is therefore re-derivable from the artifact alone:
 
 ```bash
 pip install zstandard

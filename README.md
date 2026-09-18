@@ -12,8 +12,7 @@ decode operators, a self-heal monitor, the benchmark gate suite, and the raw
 benchmark archives. **No weights, no images, no NCCL binaries.**
 
 中文说明 → **[README.zh-CN.md](README.zh-CN.md)** · 完整部署与基准文档 → **[docs/](docs/)** ·
-勘误记录 → **[docs/ERRATA-2026-09-18.md](docs/ERRATA-2026-09-18.md)** ·
-⚠️ 基准工具链状态（PR/DE 表格暂定）→ **[benchmarks/README.md](benchmarks/README.md) §6**
+基准口径与全部原始归档 → **[benchmarks/README.md](benchmarks/README.md)** / **[data/](data/)**
 
 ---
 
@@ -28,100 +27,97 @@ appear in this repo and they are *not* interchangeable — read the tag before q
 | max concurrency | **16** | 12 |
 | fp4 indexer | **enabled** | disabled (evaluated, then off) |
 | `EP_SIZE` | 2 | 2 |
-| board | §2 / §3 below | §5 below |
+| board | §2 below | §5 below |
 | full doc | [docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md) | [docs/4DGX-dsv41-基准测试-横向对比-20260912.md](docs/4DGX-dsv41-基准测试-横向对比-20260912.md) |
 
 Exact image IDs, SGLang commit, component versions and the release-artifact hashes:
 **[BUILD-IDENTITY.md](BUILD-IDENTITY.md)**.
 Thinking mode is written as `OFF · ON` where both were measured.
 
+**One measurement convention, stated once.** Every performance table in this repo is
+**SD-1**: chat channel + prompt-label output types (no guided decoding) + the output
+budget force-filled + a fresh nonce on every request + one aggregation rule. It is
+defined and justified in [FINAL-METRICS §1](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)
+and implemented once, in [`benchmarks/sd_protocol.py`](benchmarks/sd_protocol.py).
+Every archive records the convention and the wave count that produced it, so a file is
+self-describing. **Read [FINAL-METRICS §1.3](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)
+before comparing two rows: each table carries its own error bar, and a difference
+smaller than that error bar is not a result.**
+
 ---
 
-## 2. Form A — 600K production board (2026-09-17/18)
+## 2. Form A — 600K production board
 
-Measured on the running production build. **The full 30-cell PR matrix + 15-cell DE
-free-form matrix + 10-cell structured matrix are in
-[docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)**;
-raw archives in [`data/`](data/).
+Measured on the running production build. Full tables, per-cell aggregates and the
+raw archives: [docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)
+and [`data/sd1-20260918/`](data/sd1-20260918/).
 
-> ⚠️ **Provisional — the benchmark toolchain is under revision, and the PR and DE tables
-> will be re-run.** The harnesses behind these tables do not currently share one
-> statistics convention, so numbers are not yet comparable across them. Every value below
-> is a measured value and none is withdrawn; what is not yet true is that one rule
-> produced all of them. The two **decode** peaks are DE free-form rows; the **prefill**
-> and **TTFT** rows are PR-matrix rows; GSM8K and cold start are unaffected. Scope and
-> exit criteria: [`benchmarks/README.md`](benchmarks/README.md) §6.
+### DE decode, per stream (4 prompt-label types, no grammar, force-filled budget)
+
+4 types × 5 concurrencies × 3 waves; cell value = `statistics.median` over every ok
+stream of every wave. Full 20-cell table with aggregates and TTFT in
+[FINAL-METRICS §4](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md).
+
+| Type | C=1 | C=2 | C=4 | C=8 | C=16 | wave spread |
+|---|---:|---:|---:|---:|---:|---:|
+| code | **83.59** | 65.39 | 56.41 | 41.34 | **34.97** | ±2.2–±6.1% |
+| json | 76.20 | 64.85 | 50.18 | 33.64 | 29.90 | ±0.5–±4.0% |
+| structured | 56.41 | 44.41 | 42.25 | 27.42 | 21.31 | **±17.7–±45.0%** |
+| prose | 45.84 | 35.74 | 27.20 | 17.89 | 14.80 | ±0.8–±7.4% |
+
+> **`structured` here is a prompt label, not a grammar constraint.** Ranking
+> `code > json > structured > prose` holds at all five concurrencies, but only **11 of the 15**
+> adjacent gaps clear their own error bar — at C1/C2 only `code` vs `prose` resolves.
+> **Read the spread column before comparing two rows.** The cause of `structured`'s
+> spread is *not identified*, and no table here claims one.
+
+### PR prompt-rate matrix (6 input sizes × 5 concurrencies) — [FINAL-METRICS §3](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)
+
+Aggregate prefill rate at and above 8192 input tokens is **flat in concurrency** —
+524288 holds 1323–1409 tok/s from C=1 to C=16, and the 16th stream's TTFT is
+**5955 s** — because the engine admits prefill one request at a time above the
+4096-token chunk size. Three independent evidence channels (client dispatch spread
+0–697 ms with `peak_client_overlap == C` everywhere, the engine's own running/queue
+gauges, and the scheduler's per-step `#new-seq`) agree: **27/30 cells match the
+admission law `min(C, floor(4096/input))` exactly, and the 3 exceptions are page-size
+seam steps, not violations.**
+
+> ⚠️ **This is the one table whose column names invite a wrong reading, so read
+> [benchmarks/README.md §3.2](benchmarks/README.md) first.** The engine runs
+> `--chunked-prefill-size 4096`, and above that prompt length the scheduler gives the
+> in-flight chunked request the whole step's prefill budget. Prefill therefore advances
+> **one request at a time** for any input > 4096 tokens — the aggregate prompt-rate column
+> collapses to the single-stream chunked rate, and `median TTFT` at C>1 is a
+> queue-position figure, not an engine latency. The matrix carries the engine's own
+> running/queue counters per cell so this is measured rather than asserted.
+
+### Gateway and short-output arms
+
+| metric | value | note |
+|---|---|---|
+| `:8001` gateway vs direct `:8899` | prefill **+0.9 %** · decode **−0.2 %** · wall **+0.3 %** | n=2 per arm — enough to exclude an order-of-magnitude penalty, **not** enough to exclude a single-digit-percent one ([§6](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)) |
+| fp4-indexer, 256-token budget, `code` | C1 **88.58** · C8 44.52 · C16 36.99 tok/s/req | **one arm only** — the indexer is on; the off arm needs a restart. Not an A/B ([§7](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)) |
+
+### Headline figures
 
 | metric | value |
 |---|---|
-| prefill peak | **3,436.14 t/s** (8192-token input, C8) |
-| prefill peak, long input | **3,403.66 t/s** (32768-token input, C4) |
-| single-stream decode peak | **99.4 t/s** (coding, C1) |
-| aggregate decode peak | **460.0 t/s** (prose, C16) |
-| worst single-stream TTFT | **1,255.67 s** (524288-token input, C16 — 10/16 OK, client timeout) |
-| GSM8K, 200 questions | **0.9600** (192/200) · temp 0.6, 8-shot |
+| prefill peak | **[FINAL-METRICS §3](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)** |
+| single-stream decode peak | **83.59 t/s** (code, C1) |
+| aggregate decode peak | **537.5 t/s** (code, C16) |
+| GSM8K, 200 questions | **0.9600** (192/200) · temp 0.6, 8-shot · indexer off |
 | engine cold start | **345.7 s ≈ 5.8 min** (`tokenizer_e2e`) |
 
-**Complete PR matrix** (6 input sizes × 5 concurrencies = 30 cells, 2026-09-17),
-**effective prefill tok/s** (includes queueing and mixed decode until the last request
-reaches its first token):
+Guided decoding, the chat-vs-native channel comparison and what a repeated prompt is
+worth are measured as their own arms in
+[FINAL-METRICS §5](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md) and
+[§8](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md), with the archives beside
+them under [`data/sd1-20260918/`](data/sd1-20260918/).
 
-| Input tokens | C=1 | C=2 | C=4 | C=8 | C=16 |
-|---:|---:|---:|---:|---:|---:|
-| 512 | 1324.60 | 1443.17 | 2525.14 | 2896.32 | 2357.95 |
-| 2048 | 2554.66 | 2970.29 | 3112.65 | 3200.83 | 3154.90 |
-| 8192 | 3238.14 | 3342.89 | 3356.75 | **3436.14** | 3388.08 |
-| 32768 | 3351.81 | 3259.12 | 3403.66 | 3428.73 | 3391.31 |
-| 131072 | 3113.18 | 3003.73 | 3109.48 | 2951.56 | 2959.88 |
-| 524288 | 2283.67 | 2248.99 | 2265.39 | 2304.64 | 2280.40 |
-
-Per-request decode, TTFT and common-window aggregate columns are in the full doc.
-
-**Complete DE matrix** (512-token prompt, 4096-token budget, **aggregate decode tok/s**):
-
-| Task | C=1 | C=2 | C=4 | C=8 | C=16 |
-|---|---:|---:|---:|---:|---:|
-| coding | 99.4 | 136.7 | 171.6 | 213.5 | 339.0 |
-| json | 77.2 | 117.3 | 159.2 | 207.7 | 336.9 |
-| prose | 43.4 | 86.0 | 107.6 | 263.3 | **460.0** |
-| coding *(xgrammar-constrained)* | 89.5 | 115.9 | 182.6 | 210.4 | **367.2** |
-| json *(xgrammar-constrained)* | 30.2 | 66.5 | 126.2 | 183.5 | 269.8 |
-
-### DE v3 — sparkDash-aligned decode matrix (2026-09-18, the corrected read) ✅
-
-The two DE tables above do not answer "which output *shape* is fastest": the constrained
-rows pay a per-token xgrammar mask no other row carries, and the free-form rows use
-different prompts and a single wave. `de_matrix_v3.py` re-measures all four shapes under
-sparkDash's own protocol — prompt-label types, **no grammar**, budget force-filled with
-`min_tokens=max_tokens + ignore_eos + stop=[]`, temp 0 / top_p 1 / thinking off,
-3 waves, one aggregation rule — and cross-checks against sparkDash's own run through
-`:8001` (+0.7 %). Full matrix in [FINAL-METRICS §4b](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md);
-root cause and validation in [`benchmarks/README.md`](benchmarks/README.md) §7.
-
-**Aggregate decode tok/s** (`max_tokens=2048`):
-
-| Type | C=1 | C=2 | C=4 | C=8 | C=16 |
-|---|---:|---:|---:|---:|---:|
-| code | 84.3 | 130.2 | 229.8 | 320.5 | **562.9** |
-| json | 78.1 | 125.1 | 193.8 | 268.5 | 472.0 |
-| structured | 83.0 | 115.9 | 114.7 | 188.5 | 302.6 |
-| prose | 47.4 | 71.0 | 100.0 | 132.1 | 206.3 |
-
-**Ranking: code > json > structured > prose at every concurrency.** Structured shapes
-decode *faster* than prose — dense, predictable tokens give DSpark speculation more to
-work with. Earlier appearances that "structured scored below prose" compared a
-grammar-constrained workload against a free-form one; that gap is the cost of guided
-decoding (json C1: 78.1 → 30.2 t/s, −61 %), not a model property.
-
-**Two structured-output traps** (both reproduced):
-
-1. 🔴 Passing `sampling_params.json_schema` as a **dict kills the engine**
-   (xgrammar `TypeError: unhashable type: 'dict'` → scheduler dies → container exit 247).
-   **Always pass a JSON string.** Any caller sending a dict-shaped `response_format`
-   through the serving gateway can restart the whole stack — unfixed upstream.
-2. 🟠 Under grammar constraints `ignore_eos=True` stops working: if the schema can
-   terminate, EOS still fires. Use constraints that cannot be satisfied early
-   (e.g. `minItems`) if you need the full token budget.
+**Two structured-output traps** — passing `sampling_params.json_schema` as a **dict**
+kills the engine, and under a grammar `ignore_eos=True` stops guaranteeing a full
+budget. Both reproduce on the native `/generate` path; the mechanism and the workaround
+are in [benchmarks/README.md §3.1](benchmarks/README.md).
 
 ---
 
@@ -146,11 +142,14 @@ decoding (json C1: 78.1 → 30.2 t/s, −61 %), not a model property.
 | `DSV41_CACHE_GIB=1` / 16-way | Engram row cache: hit rate 0 → 99.1 %, c12 +6 %, prefill 100 K +10.5 % |
 | `DSV41_SHARED_PAD_K=1` | upstream PR #17: keeps the shared expert's K=576 shape eligible for b12x (bit-identical) |
 | static verify mode | upstream compact/ragged mode trips an engram target-verify assertion on V4.1 (sgl-project/sglang#39173) |
+| `CHUNKED_PREFILL_SIZE=4096` | what makes a 524288-token prompt fit at all — and the reason long-prompt prefill is serialized one request at a time. See [benchmarks/README.md §3.2](benchmarks/README.md) |
 
-**fp4 indexer (`--enable-deepseek-v4-fp4-indexer`) is currently ON** in Form A.
-It was evaluated at −6.4 % / −0.9 % / −3.3 % (c1 / c8 / c16) on 2026-09-17 and is
-documented in Form B as *reverted*. Both statements are true for their own form —
-the switch is env-level and reversible.
+**fp4 indexer (`--enable-deepseek-v4-fp4-indexer`) is ON** in Form A. It is an
+env-level switch and Form B runs with it off; the two forms are different
+configurations, so neither row should be quoted against the other. The A/B that would
+decide it needs a restart and is a window item
+([FINAL-METRICS §7](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md),
+[§11](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)).
 
 **One known regression, kept and disclosed:** c6 aggregate 260 → 236 (−9 %), an EP2
 side effect; c8/c12 rise far more.
@@ -258,6 +257,10 @@ Engram cache 1 GiB/16-way · `--min-free-slots-delay 1` · no fp4 indexer.**
 Full six-stack comparison incl. LuZ / Vision-Exp / GLM:
 [docs/4DGX-dsv41-基准测试-横向对比-20260912.md](docs/4DGX-dsv41-基准测试-横向对比-20260912.md).
 
+> **These figures belong to Form B and are not comparable with §2.** Different context
+> and pool size, different concurrency ceiling, indexer off, and a pre-SD-1 accounting
+> convention. The comparison document states its own scope.
+
 | benchmark | value |
 |---|---|
 | decode peak / mean (code, temp 0) | **100.3 / 81.4** · 99.8 / 81.2 tok/s (OFF · ON) |
@@ -292,21 +295,29 @@ Full six-stack comparison incl. LuZ / Vision-Exp / GLM:
 - `b12x-site/` — vendored b12x CuTe-DSL kernel library (Layer 1 above)
 - `scripts/` — SSH helper, `verify/` probe kit, self-heal monitor + systemd unit,
   `gate.sh`, `nccl_selfcheck.sh`, `verify_release_artifact.py` (**offline** archive
-  verifier: blob integrity + content identity, no cluster needed)
+  verifier: blob integrity + content identity, no cluster needed), and the three
+  repository checks (`check_redaction.py`, `check_relative_links.py`,
+  `check_report_tables.py`)
 - `benchmarks/` — the harnesses that produced the tables, with a
-  [harness-to-archive map](benchmarks/README.md): PR matrix, DE free-form, DE
-  structured, fp4-indexer A/B, gateway-vs-direct A/B
+  [harness-to-archive map](benchmarks/README.md), the
+  [SD-1 protocol](benchmarks/README.md), the
+  [redaction policy](benchmarks/README.md), and
+  [§3.2 on the engine's prefill admission law](benchmarks/README.md)
 - `bench/` — gate suite (needle / corruption / termination / code-gate), vision gate,
   prose, GSM8K, third-party-shaped sweep, MoE numeric/capacity ladders
-- `data/` — **raw benchmark archives** (PR 30-cell, DE 15-cell free-form, DE 10-cell
-  structured, 2 GSM8K runs) so every summary number can be re-derived, plus the recorded
-  offline audit of the release archive (`data/release-artifact-20260918/`). One column is
-  a known exception — see [`data/README.md`](data/README.md)
+- `data/` — **raw benchmark archives** under `data/sd1-20260918/`: the DE matrix with
+  per-stream records, the grammar A/B, the fp4 short-output arm, gateway-vs-direct, the
+  30-cell PR matrix with the engine's own per-step counters, and the two GSM8K runs —
+  plus the recorded offline audit of the release archive
+  (`data/release-artifact-20260918/`). Every published figure is re-derivable from these
+  files; [`data/README.md`](data/README.md) says how, and names the one column that is
+  not
 - `.env.tp4.example` — the configuration this repo runs (sanitized template; the live
   `.env.tp4` is gitignored)
-- `BUILD-IDENTITY.md` — image IDs, SGLang commit, component versions, artifact hashes
-- `docs/` — deployment plan, upstream ISSUE/PR survey, benchmark comparison,
-  final metrics board, [errata](docs/ERRATA-2026-09-18.md)
+- `BUILD-IDENTITY.md` — image IDs, SGLang commit, component versions, artifact hashes,
+  and the exact identity formula to check an image against
+- `docs/` — deployment plan, upstream ISSUE/PR survey, benchmark comparison, and the
+  final metrics board
 
 ---
 
@@ -353,6 +364,16 @@ the empty-input trap (`01ba4719c80b6fe9` = a **missing** image, not an identity)
 
 Internal IPs / hostnames are replaced with placeholders and API keys are removed
 (`YOUR_API_KEY`); the site `.env.tp4` is excluded via `.gitignore`.
+
+**The one class that is masked rather than classified** is `PEER_HCA_RANK0..3`: on a
+4-node ring that map encodes the physical cabling. `.env.tp4.example` carries
+`<PINNING>` plus a three-step derivation so you can produce your own map from a
+`NCCL_DEBUG=INFO` first boot, and `./start-tp4.sh ncclcheck` verifies it. The rationale,
+and the list of hits that are deliberately *left alone* (generic address scheme, upstream
+author identifiers, stock HCA names), are in
+[benchmarks/README.md §4](benchmarks/README.md).
+`scripts/check_redaction.py` re-checks all of it and exits non-zero on any unclassified
+hit in a blocker class.
 
 The repository's default branch is **`main`**, and **the adaptation lives on `main`** —
 this is a standalone engineering snapshot, not a branch of the upstream project.

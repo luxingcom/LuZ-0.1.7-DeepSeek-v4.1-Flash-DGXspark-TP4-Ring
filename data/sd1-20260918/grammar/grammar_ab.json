@@ -1,0 +1,138 @@
+{
+ "_meta": {
+  "protocol_id": "SD-1",
+  "run_tag": "sd1-20260918T060913",
+  "started": "2026-09-18T07:12:53",
+  "updated": "2026-09-18T07:44:20"
+ },
+ "GRAMMAR_AB_C1": {
+  "conc": 1,
+  "max_tokens": 2048,
+  "waves": 3,
+  "run_tag": "sd1-20260918T060913",
+  "free": {
+   "ok_waves": 3,
+   "median_decode_tps": 73.35,
+   "agg_decode_tps": 73.3,
+   "median_prefill_tps": 332.6,
+   "median_ttft_s": 0.2826,
+   "median_completion_tokens": 2048
+  },
+  "grammar": {
+   "ok_waves": 3,
+   "median_decode_tps": 76.66,
+   "agg_decode_tps": 76.7,
+   "median_prefill_tps": 301.5,
+   "median_ttft_s": 0.3118,
+   "median_completion_tokens": 2048
+  },
+  "decode_delta_pct": 4.5,
+  "agg_delta_pct": 4.6,
+  "prefill_delta_pct": -9.4,
+  "convention": "native /generate both arms; same prompt body, one nonce per request so neither arm warms the other's prefix; only json_schema differs; schema carries minItems=400 so the grammar cannot satisfy it and stop early. SD-1: chat channel, prompt-label output types (no guided decoding), force-fill min_tokens=max_tokens + ignore_eos + stop=[], temp 0 / top_p 1 / thinking off, fresh nonce on every request incl. C=1, per-stream decode=(ct-1)/(tLast-tFirst), cell central value = statistics.median over all ok streams of all waves, aggregates over absolute timestamps (union / intersection / wall all emitted), wave count recorded"
+ },
+ "GRAMMAR_AB_C2": {
+  "conc": 2,
+  "max_tokens": 2048,
+  "waves": 3,
+  "run_tag": "sd1-20260918T060913",
+  "free": {
+   "ok_waves": 3,
+   "median_decode_tps": 39.94,
+   "agg_decode_tps": 75.9,
+   "median_prefill_tps": 299.1,
+   "median_ttft_s": 0.3144,
+   "median_completion_tokens": 2048.0
+  },
+  "grammar": {
+   "ok_waves": 3,
+   "median_decode_tps": 59.66,
+   "agg_decode_tps": 118.4,
+   "median_prefill_tps": 262.5,
+   "median_ttft_s": 0.3581,
+   "median_completion_tokens": 2048.0
+  },
+  "decode_delta_pct": 49.4,
+  "agg_delta_pct": 56.0,
+  "prefill_delta_pct": -12.2,
+  "convention": "native /generate both arms; same prompt body, one nonce per request so neither arm warms the other's prefix; only json_schema differs; schema carries minItems=400 so the grammar cannot satisfy it and stop early. SD-1: chat channel, prompt-label output types (no guided decoding), force-fill min_tokens=max_tokens + ignore_eos + stop=[], temp 0 / top_p 1 / thinking off, fresh nonce on every request incl. C=1, per-stream decode=(ct-1)/(tLast-tFirst), cell central value = statistics.median over all ok streams of all waves, aggregates over absolute timestamps (union / intersection / wall all emitted), wave count recorded"
+ },
+ "GRAMMAR_AB_C4": {
+  "conc": 4,
+  "max_tokens": 2048,
+  "waves": 3,
+  "run_tag": "sd1-20260918T060913",
+  "free": {
+   "ok_waves": 3,
+   "median_decode_tps": 38.46,
+   "agg_decode_tps": 135.4,
+   "median_prefill_tps": 213.2,
+   "median_ttft_s": 0.4409,
+   "median_completion_tokens": 2048.0
+  },
+  "grammar": {
+   "ok_waves": 3,
+   "median_decode_tps": 46.92,
+   "agg_decode_tps": 186.3,
+   "median_prefill_tps": 237.0,
+   "median_ttft_s": 0.3967,
+   "median_completion_tokens": 2048.0
+  },
+  "decode_delta_pct": 22.0,
+  "agg_delta_pct": 37.6,
+  "prefill_delta_pct": 11.2,
+  "convention": "native /generate both arms; same prompt body, one nonce per request so neither arm warms the other's prefix; only json_schema differs; schema carries minItems=400 so the grammar cannot satisfy it and stop early. SD-1: chat channel, prompt-label output types (no guided decoding), force-fill min_tokens=max_tokens + ignore_eos + stop=[], temp 0 / top_p 1 / thinking off, fresh nonce on every request incl. C=1, per-stream decode=(ct-1)/(tLast-tFirst), cell central value = statistics.median over all ok streams of all waves, aggregates over absolute timestamps (union / intersection / wall all emitted), wave count recorded"
+ },
+ "GRAMMAR_AB_C8": {
+  "conc": 8,
+  "max_tokens": 2048,
+  "waves": 3,
+  "run_tag": "sd1-20260918T060913",
+  "free": {
+   "ok_waves": 3,
+   "median_decode_tps": 25.81,
+   "agg_decode_tps": 154.1,
+   "median_prefill_tps": 134.4,
+   "median_ttft_s": 0.6996,
+   "median_completion_tokens": 2048.0
+  },
+  "grammar": {
+   "ok_waves": 3,
+   "median_decode_tps": 32.74,
+   "agg_decode_tps": 259.2,
+   "median_prefill_tps": 177.8,
+   "median_ttft_s": 0.5288,
+   "median_completion_tokens": 2048.0
+  },
+  "decode_delta_pct": 26.9,
+  "agg_delta_pct": 68.2,
+  "prefill_delta_pct": 32.3,
+  "convention": "native /generate both arms; same prompt body, one nonce per request so neither arm warms the other's prefix; only json_schema differs; schema carries minItems=400 so the grammar cannot satisfy it and stop early. SD-1: chat channel, prompt-label output types (no guided decoding), force-fill min_tokens=max_tokens + ignore_eos + stop=[], temp 0 / top_p 1 / thinking off, fresh nonce on every request incl. C=1, per-stream decode=(ct-1)/(tLast-tFirst), cell central value = statistics.median over all ok streams of all waves, aggregates over absolute timestamps (union / intersection / wall all emitted), wave count recorded"
+ },
+ "GRAMMAR_AB_C16": {
+  "conc": 16,
+  "max_tokens": 2048,
+  "waves": 3,
+  "run_tag": "sd1-20260918T060913",
+  "free": {
+   "ok_waves": 3,
+   "median_decode_tps": 21.88,
+   "agg_decode_tps": 234.0,
+   "median_prefill_tps": 117.2,
+   "median_ttft_s": 0.8017,
+   "median_completion_tokens": 2048.0
+  },
+  "grammar": {
+   "ok_waves": 3,
+   "median_decode_tps": 29.38,
+   "agg_decode_tps": 463.7,
+   "median_prefill_tps": 113.8,
+   "median_ttft_s": 0.8258,
+   "median_completion_tokens": 2048.0
+  },
+  "decode_delta_pct": 34.3,
+  "agg_delta_pct": 98.2,
+  "prefill_delta_pct": -2.9,
+  "convention": "native /generate both arms; same prompt body, one nonce per request so neither arm warms the other's prefix; only json_schema differs; schema carries minItems=400 so the grammar cannot satisfy it and stop early. SD-1: chat channel, prompt-label output types (no guided decoding), force-fill min_tokens=max_tokens + ignore_eos + stop=[], temp 0 / top_p 1 / thinking off, fresh nonce on every request incl. C=1, per-stream decode=(ct-1)/(tLast-tFirst), cell central value = statistics.median over all ok streams of all waves, aggregates over absolute timestamps (union / intersection / wall all emitted), wave count recorded"
+ }
+}

@@ -1,0 +1,46 @@
+run_tag=sd1-20260918T060913
+host=[node-hostname] started=2026-09-18T06:09:13+00:00
+sampler_pid=1490525
+===== STAGE de (de_matrix_v3.py) start 2026-09-18T06:09:13+00:00 =====
+===== STAGE de exit=0 elapsed=3819s 2026-09-18T07:12:52+00:00 =====
+===== STAGE grammar (grammar_ab.py) start 2026-09-18T07:12:52+00:00 =====
+===== STAGE grammar exit=0 elapsed=1888s 2026-09-18T07:44:20+00:00 =====
+===== STAGE fp4_256 (de_matrix_v3.py) start 2026-09-18T07:44:20+00:00 =====
+===== STAGE fp4_256 exit=0 elapsed=56s 2026-09-18T07:45:16+00:00 =====
+===== STAGE gw (gw_ab_v2.py) start 2026-09-18T07:45:16+00:00 =====
+===== STAGE gw exit=0 elapsed=858s 2026-09-18T07:59:34+00:00 =====
+===== STAGE pr (pr_matrix_v2.py) start 2026-09-18T07:59:34+00:00 =====
+===== STAGE pr exit=143 elapsed=2900s 2026-09-18T08:47:54+00:00 =====
+ALL DONE 2026-09-18T08:47:54+00:00
+RUNDIR=[bench-results-root]/sd1-20260918T060913
+===== OPERATOR ABORT of STAGE pr at 2026-09-18T08:47:59+00:00 =====
+reason: REQUEST_TIMEOUT=3600 is below the 524288 row's requirement.
+  prefill is one request at a time above --chunked-prefill-size (4096),
+  so the 16th stream's first token lands near 16*524288/1680 t/s = ~5000 s.
+  A 3600 s cap would have dropped the cell's tail silently.
+also fixed: no warm-up before cell 1 (the 512/2048 rows ran cold).
+harness: pr_matrix_v2.py rebuilt to the de_matrix_v3.py launch form,
+  with an engine-side running/queue counter probe per cell.
+partial output preserved as pr-prefix/ and not shipped.
+STAGE pr aborted=1 2026-09-18T08:47:59+00:00
+note: the 'ALL DONE 2026-09-18T08:47:54+00:00' above was emitted by run_sd1_all.sh
+      as a *consequence of the abort* (its docker exec returned non-zero), not a
+      completed chain. The chain is resumed below by run_sd1_pr_closure.sh.
+run_tag=sd1-20260918T060913 (resumed) stages=pr started=2026-09-18T08:50:44+00:00
+sampler_pid=2171471
+  (skipping stage de: not in STAGES=pr)
+  (skipping stage grammar: not in STAGES=pr)
+  (skipping stage fp4_256: not in STAGES=pr)
+  (skipping stage gw: not in STAGES=pr)
+===== STAGE pr (pr_matrix_v2.py) start 2026-09-18T08:50:44+00:00 =====
+===== STAGE pr exit=0 elapsed=15971s 2026-09-18T13:16:55+00:00 =====
+STAGES DONE (pr) 2026-09-18T13:16:55+00:00
+RUNDIR=[bench-results-root]/sd1-20260918T060913
+run_tag=sd1-20260918T060913 (extra stages) started=2026-09-18T13:16:55+00:00
+sampler_pid=3394182
+===== STAGE cache (cache_effect_probe.py) start 2026-09-18T13:16:55+00:00 =====
+===== STAGE cache exit=143 elapsed=154s 2026-09-18T13:19:29+00:00 =====
+===== STAGE channel (channel_ab.py) start 2026-09-18T13:19:29+00:00 =====
+OPERATOR ABORT: extra stages (cache/channel/grammar2) cancelled by owner decision at 2026-09-18T13:19:33Z; PR stage (30 cells, exit=0) is the final data.
+===== STAGE channel aborted=1 (operator abort, owner decision) 2026-09-18T13:19:59Z =====
+===== extra stages cancelled before grammar2; chain closed =====

@@ -2,136 +2,84 @@
 
 Every summary number in the READMEs and in `docs/03-final-metrics/` must be
 re-derivable from the files in this directory. If you find a published figure that has
-no file behind it, that is a bug — please report it (see `docs/ERRATA-2026-09-18.md`
-for a case where exactly this happened).
+no file behind it, that is a bug — please report it.
 
 All runs below were made against the **current production form**:
 600 K context · 9,600,000-token KV pool · `max_running_requests=16` · `TP4 / EP2` ·
 DSpark (draft k=5 / verify=6) · fp4 indexer **enabled**. See
 [`../BUILD-IDENTITY.md`](../BUILD-IDENTITY.md) for the exact image and software stack.
 
-> ⚠️ **Provisional archives.** The benchmark toolchain is under revision: the harnesses do
-> not yet share one statistics convention, so `pr-matrix-20260917/`,
-> `de-freeform-20260917/` and `de-structured-20260918/` are **provisional and will be
-> re-measured**. Every file here is the unmodified output of its run, and every number in
-> it stays re-derivable from the file; the caveat is only about comparing *across* tables.
-> `gsm8k-20260917/`, `release-artifact-20260918/` and `de-v3-20260918/` are **not**
-> affected (v3 already uses the unified convention). See
-> [`../benchmarks/README.md`](../benchmarks/README.md) §3 for the census, §6 for the
-> scope and exit criteria of the re-run, and §7 for the v3 harness.
+The measurement convention is **SD-1**, defined and justified in
+[`../docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md`](../docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)
+§1 and implemented exactly once, in [`../benchmarks/sd_protocol.py`](../benchmarks/sd_protocol.py).
+Each JSON file additionally records the convention and the wave count that produced it,
+so a file is self-describing even if this page drifts.
 
 ---
 
-## `pr-matrix-20260917/` — prefill / decode matrix, 30 cells
+## `sd1-20260918/` — the SD-1 measurement set
 
-6 input sizes (512, 2048, 8192, 32768, 131072, 524288 tokens) × 5 concurrencies
-(1, 2, 4, 8, 16), 1024-token output budget, synthetic repeated text with unique
-prefixes. **This is a throughput test, not a quality test.**
+**Every published performance table, measured under one convention.** Produced by
+[`../benchmarks/run_sd1_all.sh`](../benchmarks/run_sd1_all.sh) followed by
+[`../benchmarks/run_sd1_extra.sh`](../benchmarks/run_sd1_extra.sh); `run.log` in the run
+directory on the head node carries each stage's start, exit code and elapsed time.
 
-Harness: [`../benchmarks/matrix.py`](../benchmarks/matrix.py) — per-cell value is
-`statistics.median`. ⚠️ **Provisional**, pending the re-run in `benchmarks/README.md` §6.
+| subdirectory | what it holds | status |
+|---|---|---|
+| `de/` | DE matrix, 4 prompt-label types × 5 concurrencies × 3 waves = **20 cells**, plus the 20 per-cell raw record files | ✅ complete |
+| `grammar/` | guided-decoding A/B, 5 concurrencies × 2 arms × 3 waves, **with the per-stream records** | ✅ complete |
+| `fp4_256/` | fp4-indexer short-output arm, 256-token budget, `code` type, C=1/8/16 | ✅ complete (**one arm**: the indexer is on) |
+| `gw/` | `:8001` gateway vs direct `:8899`, three arms (prefill / decode / wall), `ROUNDS=2` | ✅ complete |
+| `pr/` | prompt-rate matrix, 6 input sizes × 5 concurrencies = **30 cells**, token-exact input via native `/generate`, plus `engine-steps.log` (the engine's own per-step prefill/decode counters for the same window) and a per-cell `engine_probe` in `summary.json` | ⏳ collecting |
+| `cache/` | what a repeated prompt is worth, at 2 k / 32 k / 131 k — prices the nonce defect | ⏳ not yet run |
+| `channel/` | chat vs native `/generate`, same unconstrained prompt, alternated within each wave | ⏳ not yet run |
+| `TABLES.generated.md` | every table of FINAL-METRICS §2–§8, rendered straight from this directory by `../benchmarks/render_report_tables.py`. Re-run that command to check the report byte for byte | regenerated as stages land |
 
-| file | content |
-|---|---|
-| `matrix-c1c4c16.json` | summary rows for C=1 / 4 / 16 |
-| `matrix-c2c8.json` | summary rows for C=2 / 8 |
-| `TOTAL-DECODE-MATRIX.md` | the same runs with a common-window "total decode" column (C=1/4/16 only) |
-| `COMMON-WINDOW.md` | the shared-wall-clock interval analysis behind that column |
+> The `grammar/` archive above is the **second** pass: the first one wrote no per-stream
+> records, so its cells could not be checked below cell level. The run log names that
+> stage `grammar2`; it is shipped under the plain name because it supersedes the first
+> pass entirely rather than sitting beside it.
 
-`summary.json` row fields: `input_tokens`, `concurrency`, `successes`,
-`peak_client_overlap`, `manifest_sha256`, `effective_prefill_tps`, `median_ttft_s`,
-`median_decode_tps`, `errors`.
+### Headline — DE, 2048-token budget, from `de/de_v3_matrix.json`
 
-⚠️ **Known gap (still open as of 2026-09-18).** `COMMON-WINDOW.md` and the
-total-decode column of `TOTAL-DECODE-MATRIX.md` are **not** re-derivable from what is
-shipped here. The tool that computes them, `benchmarks/common_window.py`, consumes
-**raw per-cell request records** named `<size>-c<N>.json`; this directory ships only the
-summarised arrays `matrix-c1c4c16.json` / `matrix-c2c8.json`. The raw records were not
-retained. Every other column of the PR matrix *is* re-derivable. Recorded as V4 in
-[`../benchmarks/README.md`](../benchmarks/README.md) §4.
+Median decode is token/s **per request**; the wave-spread column is that cell's own
+error bar and is not decoration.
 
-- **Effective prefill** includes queueing and mixed decode work until the last request
-  reaches its first token.
-- **Median decode** is the per-request median over emitted tokens 129–641, including
-  serving stalls.
-- **`—` in the total-decode column** means the wave never had all requested streams
-  decoding simultaneously. It is *not* zero throughput.
-- `524288 / C=16` succeeded **10/16**: the client's 2400 s budget expired first. This is
-  a client-side limit, not an engine failure, and it is reported as such everywhere.
+| | C1 | C8 | C16 | agg decode at C16 | wave spread |
+|---|---:|---:|---:|---:|---:|
+| `code` | **83.59** | 41.34 | 34.97 | **537.5** | ±2.2–±6.1 % |
+| `json` | 76.20 | 33.64 | 29.90 | 473.4 | ±0.5–±4.0 % |
+| `structured` | 56.41 | 27.42 | 21.31 | 254.9 | **±17.7–±45.0 %** |
+| `prose` | 45.84 | 17.89 | 14.80 | 231.7 | ±0.8–±7.4 % |
 
-## `de-freeform-20260917/` — decode-engine matrix, 15 cells
+> **Read the spread column.** The ordering `code > json > structured > prose` holds at
+> every concurrency, but of the 15 adjacent gaps only **11** clear their own error bar;
+> at C1 and C2 the rows separate `code` from `prose` and nothing in between.
+> `structured`'s five cells are individually too noisy to compare, and **the cause of that
+> noise is not identified** — it is recorded as unexplained rather than explained away.
+> Full discussion in FINAL-METRICS §4.1 and §4.2.
+>
+> The per-stream records are kept for every cell, so any number above can be recomputed
+> from `de/de_<type>_c<N>.json` rather than taken on trust.
 
-512-token prompt, 4096-token output budget with `ignore_eos`, three task shapes
-(coding / json / prose) × five concurrencies. Single wave per cell (not a 3-wave median).
+**`pr/` headline**: aggregate prefill rate above 8192 input tokens is flat in
+concurrency (524288: 1323–1409 tok/s from C1 to C16; the 16th stream's TTFT is
+5955 s). Three evidence channels agree — `summary.json` (engine probe), per-stream
+`t0` dispatch records, and `pr/engine-evidence.md` (per-step scheduler attribution,
+27/30 strict on the admission law; the 3 exceptions are page-size seam steps).
+The pre-restart 25 cells are in `pr-prefix/` on the run host and **not shipped**.
+`pr/engine-steps.log` holds the raw scheduler lines (5306) behind that evidence table.
 
-Harness: [`../benchmarks/de_matrix.py`](../benchmarks/de_matrix.py) — per-cell value is the
-**upper** median `sorted(x)[n//2]`, and the prefill numerator is hardcoded `512.0`.
-⚠️ **Provisional**, pending the re-run in `benchmarks/README.md` §6.
+### `fp4_256/`, `grammar/`, `gw/`
 
-| file | content |
-|---|---|
-| `de_matrix.json` | the 15 summary rows |
-| `de_<task>_c<N>.json` | the per-request raw records behind each row |
-
-Row fields: `task`, `conc`, `ok`, `requested`, `prefill_tps`, `decode_tps`,
-`ttft_s`, `median_ct`, `aggregate_decode_tps`. Per-request records carry
-`completion_tokens`, `ttft`, `wall`, `decode_tps`, `prefill_tps`.
-
-`decode_tps = (completion_tokens − 1) / (wall − ttft)`; `aggregate_decode_tps = decode_tps × N`.
-
-## `de-structured-20260918/` — grammar-constrained matrix, 10 cells
-
-Same shape as above but with a **xgrammar `json_schema`** constraint applied
-(coding / json × five concurrencies), **3 waves per cell** with the median reported.
-
-Harness: [`../benchmarks/de_matrix_structured.py`](../benchmarks/de_matrix_structured.py) —
-`statistics.median`, aggregated as the median of the 3 per-wave medians. This is the third
-aggregation rule in the suite, so §4/§5 are comparable to §3 only at C=1. ⚠️
-**Provisional**, pending the re-run in `benchmarks/README.md` §6.
-
-| file | content |
-|---|---|
-| `de_structured_matrix.json` | the 10 summary rows (adds `waves` / `ok_waves`) |
-| `de_<task>_c<N>.json` | the per-wave raw records |
-
-⚠️ Two behaviours reproduce here and are documented in the READMEs:
-passing `json_schema` as a **dict** kills the engine (`TypeError: unhashable type:
-'dict'` → container exit 247); and under grammar constraints `ignore_eos=True` no longer
-guarantees a full token budget if the schema can terminate early.
-
----
-
-## `de-v3-20260918/` — sparkDash-aligned decode matrix, 20 cells
-
-**The corrected DE measurement** (FINAL-METRICS §4b). 4 prompt-label types
-(structured / prose / code / json, prompts verbatim from sparkDash
-`src/shared/llmPrompts.js`) × 5 concurrencies × 3 waves, `max_tokens=2048`,
-`min_tokens=max_tokens + ignore_eos + stop=[]` force-fill, temp 0 / top_p 1 /
-thinking off, **no grammar constraint of any kind**. One aggregation rule for all
-cells (`statistics.median` over all ok streams of all waves), with the convention
-and wave count recorded inside the JSON itself.
-
-Harness: [`../benchmarks/de_matrix_v3.py`](../benchmarks/de_matrix_v3.py) — rationale,
-root-cause analysis of the §3/§4 distortion, and the cross-channel validation against
-sparkDash's own run (+0.7 %) are in [`../benchmarks/README.md`](../benchmarks/README.md) §7.
-
-| file | content |
-|---|---|
-| `de_v3_matrix.json` | `_meta.protocol` + the 20 summary rows (each row carries its `convention` string) |
-| `de_matrix_v3.py` | copy of the harness that produced this archive (frozen for reproducibility) |
-
-Per-stream raw records live on the machine at
-`bench-results/de-v3-20260918/de_<type>_c<N>.json` (they exceed the per-file budget
-kept in this repository); the summary JSON is complete and self-describing.
-
-| headline | value |
-|---|---|
-| C1 decode t/s | structured 83.0 · prose 47.4 · code 84.3 · json 78.1 |
-| C16 aggregate t/s | structured 302.6 · prose 206.3 · code **562.9** · json 472.0 |
-| ranking | code > json > structured > prose at every concurrency |
-| cross-check vs sparkDash (`:8001`) | json C1 78.14 vs 77.59 t/s = **+0.7 %** |
-
----
+- **`fp4_256/`** is one arm of an A/B, not the A/B: the indexer is on, and the off arm
+  requires a restart. Do not use this table to answer "on or off"; see FINAL-METRICS §7.
+- **`grammar/`** compares `sampling_params.json_schema` present vs absent on the native
+  `/generate` path, same prompt body and same accounting. Its `grammar2/` successor is
+  the auditable one.
+- **`gw/`** alternates `:8001` and direct `:8899` within each round, so both paths see the
+  same engine state. n = 2 per arm: enough to exclude an order-of-magnitude penalty,
+  **not** enough to exclude a single-digit-percent one.
 
 ## `gsm8k-20260917/` — the two GSM8K runs
 
@@ -139,9 +87,6 @@ kept in this repository); the summary JSON is complete and self-describing.
 Two rows: the 600 K production form with the fp4 indexer **off** (0.9600) and
 **on** (0.535, with 92 gateway-side errors — see that directory's README for why
 both the raw rate and the 107/108 among completed requests must be quoted).
-
-Added 2026-09-18: README §2 and the metrics board publish these figures, but the
-summary files were not in the repository, so the numbers had nothing behind them.
 
 ## `release-artifact-20260918/` — offline audit of the shipped image
 
@@ -162,13 +107,35 @@ of all five serializations of the diffID list that have been published as "the i
 
 ```bash
 python3 - <<'PY'
-import json
-rows = json.load(open('pr-matrix-20260917/matrix-c1c4c16.json'))
-peak = max(rows, key=lambda r: r['effective_prefill_tps'])
-print(peak['input_tokens'], peak['concurrency'], round(peak['effective_prefill_tps'], 2))
+import json, statistics
+d = json.load(open('data/sd1-20260918/de/de_v3_matrix.json'))
+c = d['DE-V3_code_C16']
+print(c['median_decode_tps'], c['agg_decode_tps'], c['streams_ok'])
+# -> 34.97 537.5 48
+
+c = d['DE-V3_structured_C1']
+per_wave = [w['median_decode_tps'] for w in c['waves_detail']]
+print(round((max(per_wave) - min(per_wave)) / statistics.median(per_wave) * 100, 1))
+# -> 45.0
 PY
-# -> 8192 8 3436.14
 ```
 
-The summary values are the shipped ones; they were computed by the harness at run time
-and re-checked independently when this documentation set was assembled.
+The first line is the cell's central value and the second is its aggregate; they are
+different quantities measured over different populations and are **not** expected to
+agree. The third line is why `structured` C1 cannot be compared with anything.
+
+## Conventions worth knowing before comparing two numbers
+
+- **Effective prefill** includes queueing and mixed decode work until the last request
+  reaches its first token.
+- **Per-request decode** is `(ct − 1) / (t_last − t_first)` over that stream's own
+  timestamps, so it measures one stream from its own first token onward.
+- **Aggregate decode** is measured over absolute timestamps across the whole concurrent
+  population, not by summing the per-request rates.
+- **A `—` in a total-decode column** means the wave never had all requested streams
+  decoding simultaneously. It is *not* zero throughput.
+- **`512` is not a prompt length.** In the historical harnesses it is the width of the
+  window (tokens 129–641) over which the median is taken; the actual prompt length is
+  `prompt_tokens`. Read the field, not the name.
+- **A row-to-row difference smaller than the row's own wave spread is not resolvable by
+  that table.** This applies to every table in this repository.

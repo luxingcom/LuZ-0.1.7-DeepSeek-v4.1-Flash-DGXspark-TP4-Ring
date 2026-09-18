@@ -1,0 +1,205 @@
+{
+ "_meta": {
+  "protocol_id": "SD-1",
+  "run_tag": "sd1-20260918T060913",
+  "model": "deepseek-v4.1-flash",
+  "gateway": "http://127.0.0.1:8001",
+  "direct": "http://127.0.0.1:8899",
+  "big_tokens": 131072,
+  "decode_tokens": 1024,
+  "rounds": 2,
+  "finished": "2026-09-18T07:59:34"
+ },
+ "summary": {
+  "prefill": {
+   "gw8001": {
+    "n": 2,
+    "median": 1551.4
+   },
+   "direct8899": {
+    "n": 2,
+    "median": 1537.0
+   },
+   "delta_pct": 0.9,
+   "note": "positive delta means the gateway is faster on this arm"
+  },
+  "decode": {
+   "gw8001": {
+    "n": 2,
+    "median": 47.67
+   },
+   "direct8899": {
+    "n": 2,
+    "median": 47.765
+   },
+   "delta_pct": -0.2,
+   "note": "positive delta means the gateway is faster on this arm"
+  },
+  "wall": {
+   "gw8001": {
+    "n": 2,
+    "median": 22.173
+   },
+   "direct8899": {
+    "n": 2,
+    "median": 22.11
+   },
+   "delta_pct": 0.3,
+   "note": "wall time: positive delta means the gateway makes it slower. A buffering relay is only visible here -- a streaming client is not waiting on a single read"
+  }
+ },
+ "records": [
+  {
+   "error": null,
+   "stream": true,
+   "prompt_tokens": 262090,
+   "completion_tokens": 16,
+   "wall_s": 170.3138,
+   "ttft_s": 169.7757,
+   "prefill_tps": 1543.7,
+   "decode_tps": 27.88,
+   "arm": "prefill",
+   "path": "gw8001",
+   "round": 0
+  },
+  {
+   "error": null,
+   "stream": true,
+   "prompt_tokens": 74,
+   "completion_tokens": 1024,
+   "wall_s": 22.9244,
+   "ttft_s": 0.3101,
+   "prefill_tps": 238.6,
+   "decode_tps": 45.24,
+   "arm": "decode",
+   "path": "gw8001",
+   "round": 0
+  },
+  {
+   "error": null,
+   "stream": false,
+   "prompt_tokens": 74,
+   "completion_tokens": 1024,
+   "wall_s": 21.8755,
+   "ttft_s": 21.8755,
+   "prefill_tps": 3.4,
+   "arm": "wall",
+   "path": "gw8001",
+   "round": 0
+  },
+  {
+   "error": null,
+   "stream": true,
+   "prompt_tokens": 262090,
+   "completion_tokens": 16,
+   "wall_s": 171.0667,
+   "ttft_s": 170.5157,
+   "prefill_tps": 1537.0,
+   "decode_tps": 27.23,
+   "arm": "prefill",
+   "path": "direct8899",
+   "round": 0
+  },
+  {
+   "error": null,
+   "stream": true,
+   "prompt_tokens": 74,
+   "completion_tokens": 1024,
+   "wall_s": 22.5509,
+   "ttft_s": 0.3159,
+   "prefill_tps": 234.3,
+   "decode_tps": 46.01,
+   "arm": "decode",
+   "path": "direct8899",
+   "round": 0
+  },
+  {
+   "error": null,
+   "stream": false,
+   "prompt_tokens": 74,
+   "completion_tokens": 1024,
+   "wall_s": 22.2783,
+   "ttft_s": 22.2783,
+   "prefill_tps": 3.3,
+   "arm": "wall",
+   "path": "direct8899",
+   "round": 0
+  },
+  {
+   "error": null,
+   "stream": true,
+   "prompt_tokens": 262090,
+   "completion_tokens": 16,
+   "wall_s": 168.8763,
+   "ttft_s": 168.101,
+   "prefill_tps": 1559.1,
+   "decode_tps": 19.35,
+   "arm": "prefill",
+   "path": "gw8001",
+   "round": 1
+  },
+  {
+   "error": null,
+   "stream": true,
+   "prompt_tokens": 74,
+   "completion_tokens": 1024,
+   "wall_s": 20.7339,
+   "ttft_s": 0.3143,
+   "prefill_tps": 235.5,
+   "decode_tps": 50.1,
+   "arm": "decode",
+   "path": "gw8001",
+   "round": 1
+  },
+  {
+   "error": null,
+   "stream": false,
+   "prompt_tokens": 74,
+   "completion_tokens": 1024,
+   "wall_s": 22.4715,
+   "ttft_s": 22.4715,
+   "prefill_tps": 3.3,
+   "arm": "wall",
+   "path": "gw8001",
+   "round": 1
+  },
+  {
+   "error": null,
+   "stream": true,
+   "prompt_tokens": 262090,
+   "completion_tokens": 16,
+   "wall_s": 171.3997,
+   "ttft_s": 170.5176,
+   "prefill_tps": 1537.0,
+   "decode_tps": 17.01,
+   "arm": "prefill",
+   "path": "direct8899",
+   "round": 1
+  },
+  {
+   "error": null,
+   "stream": true,
+   "prompt_tokens": 74,
+   "completion_tokens": 1024,
+   "wall_s": 20.9531,
+   "ttft_s": 0.2945,
+   "prefill_tps": 251.3,
+   "decode_tps": 49.52,
+   "arm": "decode",
+   "path": "direct8899",
+   "round": 1
+  },
+  {
+   "error": null,
+   "stream": false,
+   "prompt_tokens": 74,
+   "completion_tokens": 1024,
+   "wall_s": 21.9412,
+   "ttft_s": 21.9412,
+   "prefill_tps": 3.4,
+   "arm": "wall",
+   "path": "direct8899",
+   "round": 1
+  }
+ ]
+}

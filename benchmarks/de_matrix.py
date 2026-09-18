@@ -24,8 +24,8 @@ This harness reports the **upper** median, `sorted(x)[n // 2]`, and hardcodes
 middles for even n) and reads the real `prompt_tokens` out of `meta_info`.
 For C=1 the two agree; for even C they do not. Both are kept exactly as they
 were when the published archives were produced -- changing either one would
-make the shipped JSON no longer reproducible from this file. The divergence is
-recorded in `benchmarks/README.md` and in `docs/ERRATA-2026-09-18.md`.
+make this file's output irreproducible from the file itself. The divergence is
+recorded in `benchmarks/README.md` §3.
 
 Env
 ---

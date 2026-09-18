@@ -61,18 +61,22 @@ config's `history` likewise marks 108 of its 231 steps `empty_layer`.
 **5. Every value ever published as this image's "identity" is now accounted for.** All five
 are `sha256[:16]` of the *same* 123-entry diffID list under different serializations:
 
-| serialization | value | where it appeared |
-|---|---|---|
-| space-joined + trailing newline ← **authoritative** | `4ebef21b6aedbd70` | `start.sh` `IMGID_TPL`; README §7; BUILD-IDENTITY |
-| space-joined, no trailing newline | `bb7c2d4b38af0514` | a probe variant |
-| newline-joined, no trailing newline | `c8751accc458138c` | BUILD-IDENTITY rev.1 (called a ghost in ERRATA rev.1.1 — it is not) |
-| newline-joined + trailing newline | `38bbe8265458f328` | `start.sh` preflight comment, original |
-| newline-joined + two trailing newlines | `0050285e87c6f408` | BUILD-IDENTITY rev.1's stated formula |
+| serialization | value |
+|---|---|
+| space-joined + trailing newline ← **authoritative** | `4ebef21b6aedbd70` |
+| space-joined, no trailing newline | `bb7c2d4b38af0514` |
+| newline-joined, no trailing newline | `c8751accc458138c` |
+| newline-joined + trailing newline | `38bbe8265458f328` |
+| newline-joined + two trailing newlines | `0050285e87c6f408` |
+
+Only the first is asserted by production code (`start.sh`'s `IMGID_TPL`), so only it is
+*the* identity; the other four are correct hashes of other real serializations of the same
+list. **Publish the byte-exact pipeline together with the value** — see BUILD-IDENTITY.
 
 `e541746d26e31a3f` is the sole exception: it reproduces under **none** of the 32 candidate
 serializations tested against this archive (not any serialization of the diffID list, not
-the config blob, not either manifest, not `index.json`, not the compressed-layer list). It
-is labelled **unverifiable**, not "wrong" — see `docs/ERRATA-2026-09-18.md` rows 44–45.
+the config blob, not either manifest, not `index.json`, not the compressed-layer list), and
+no production script asserts it. It is labelled **unverifiable**, not "wrong".
 
 ## Why this directory exists
 

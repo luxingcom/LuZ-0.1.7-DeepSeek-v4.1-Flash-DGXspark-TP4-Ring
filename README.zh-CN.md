@@ -10,8 +10,7 @@ SGLang 猴补丁 / 融合 decode 算子、自愈监控、基准门禁套件，�
 **不含权重、镜像、NCCL 二进制。**
 
 English → **[README.md](README.md)** · 完整文档 → **[docs/](docs/)** ·
-勘误记录 → **[docs/ERRATA-2026-09-18.md](docs/ERRATA-2026-09-18.md)** ·
-⚠️ 基准工具链状态（PR/DE 表格暂定）→ **[benchmarks/README.md](benchmarks/README.md) §6**
+基准口径与全部原始归档 → **[benchmarks/README.md](benchmarks/README.md)** / **[data/](data/)**
 
 ---
 
@@ -26,96 +25,86 @@ English → **[README.md](README.md)** · 完整文档 → **[docs/](docs/)** ·
 | 最大并发 | **16** | 12 |
 | fp4 indexer | **开启** | 关闭（评估后回退） |
 | `EP_SIZE` | 2 | 2 |
-| 指标板 | 下文 §2 / §3 | 下文 §5 |
+| 指标板 | 下文 §2 | 下文 §5 |
 | 完整文档 | [docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md) | [docs/4DGX-dsv41-基准测试-横向对比-20260912.md](docs/4DGX-dsv41-基准测试-横向对比-20260912.md) |
 
 镜像 ID、SGLang commit、组件版本与发布件哈希：**[BUILD-IDENTITY.md](BUILD-IDENTITY.md)**。
 思考模式写作 `OFF · ON`（两者都测过）。
 
+**只有一套测量口径，且只写一次。** 本仓库所有性能表都是 **SD-1**：chat 通道 +
+提示词标签式输出类型（无引导解码）+ 强制吃满输出预算 + 每请求独立 nonce + 单一聚合规则。
+定义与设计理由在 [FINAL-METRICS §1](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)，
+实现只有一处：[`benchmarks/sd_protocol.py`](benchmarks/sd_protocol.py)。每份归档都把口径与
+波次数**写进 JSON 自身**，所以单个文件是自描述的。
+**比较两行之前请先读 [FINAL-METRICS §1.3](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)：
+每张表都带自己的误差棒，小于误差棒的差异不是结论。**
+
 ---
 
-## 2. 形态 A — 600K 生产指标板（2026-09-17/18）
+## 2. 形态 A — 600K 生产指标板
 
-在运行中的生产构建上实测。**完整 30 格 PR 矩阵 + 15 格 DE 自由文本矩阵 + 10 格结构化矩阵**
-见 [docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)；
-原始归档在 [`data/`](data/)。
+在运行中的生产构建上实测。完整表格、逐格聚合与原始归档见
+[docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)
+与 [`data/sd1-20260918/`](data/sd1-20260918/)。
 
-> ⚠️ **暂定值 —— 基准工具链正在修订，PR 与 DE 表格将会重跑。** 产出这些表格的 harness
-> 目前**尚未统一统计口径**，因此跨表数字暂时不可直接对比。下表每一个数值都是实测值、
-> 均未撤回；尚不成立的是「它们出自同一条规则」。其中两个 **decode** 峰值为 DE 自由文本行，
-> **prefill** 与 **TTFT** 行为 PR 矩阵行，GSM8K 与冷启不受影响。影响范围与退出判据见
-> [`benchmarks/README.md`](benchmarks/README.md) §6。
+### DE 单流 decode（4 种提示词标签，零 grammar，强制吃满）
+
+4 类型 × 5 并发 × 3 波；格中心值 = 全部有效流的 `statistics.median`。完整 20 格表、
+聚合与 TTFT 见 [FINAL-METRICS §4](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)。
+
+| 类型 | C=1 | C=2 | C=4 | C=8 | C=16 | 波次离散度 |
+|---|---:|---:|---:|---:|---:|---:|
+| code | **83.59** | 65.39 | 56.41 | 41.34 | **34.97** | ±2.2–±6.1% |
+| json | 76.20 | 64.85 | 50.18 | 33.64 | 29.90 | ±0.5–±4.0% |
+| structured | 56.41 | 44.41 | 42.25 | 27.42 | 21.31 | **±17.7–±45.0%** |
+| prose | 45.84 | 35.74 | 27.20 | 17.89 | 14.80 | ±0.8–±7.4% |
+
+> **此处的 `structured` 是提示词标签，不是 grammar 约束。** 排序
+> `code > json > structured > prose` 在 5 个并发档全部成立，但 15 个相邻间隔中只有 **11 个**
+> 超出各自误差棒 —— C1/C2 档只能分辨 `code` 与 `prose` 的首尾。
+> **比较两行之前先看离散度列。** `structured` 的离散成因**未识别**，本仓库不给出解释。
+
+### PR 提示词速率矩阵（6 种输入 × 5 种并发）—— [FINAL-METRICS §3](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)
+
+**8192 以上各档的聚合 prefill 速率对并发是平的**——524288 档从 C=1 到 C=16 全部落在
+1323–1409 tok/s，第 16 条流的 TTFT 为 **5955 s**——因为引擎在超过 4096 token 的 chunk
+尺寸后**逐请求推进 prefill**。三层独立证据（客户端下发离散度 0–697 ms 且
+`peak_client_overlap == C` 处处成立、引擎自身 running/queue 指示器、调度器逐步 `#new-seq`）
+相互吻合：**27/30 格与准入律 `min(C, floor(4096/input))` 精确一致，3 个例外是页粒度接缝
+小步，不是违约。**
+
+> ⚠️ **这是唯一一张列名会诱导误读的表，引用前请先读
+> [benchmarks/README.md §3.2](benchmarks/README.md)。** 引擎以
+> `--chunked-prefill-size 4096` 运行；当提示词长度超过该值时，调度器把**整步**的 prefill
+> 预算给那个正在切的 chunked 请求，于是 **prefill 逐请求串行**：聚合 prefill 列塌缩为
+> **单流** chunked 速率，`median TTFT`（C>1）是**排队位置**的量而不是引擎延迟。
+> 该矩阵**逐格采样引擎自身的 running/queue 计数**，所以这件事是被测出来的，不是被声明的。
+
+### 网关与短输出臂
+
+| 指标 | 数值 | 说明 |
+|---|---|---|
+| `:8001` 网关 vs 直连 `:8899` | prefill **+0.9 %** · decode **−0.2 %** · wall **+0.3 %** | 每臂 n=2 —— 足以排除数量级差异，**不足以**排除个位数百分比差异（[§6](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)） |
+| fp4 indexer，256 token 预算，`code` | C1 **88.58** · C8 44.52 · C16 36.99 t/s/流 | **只有一条臂** —— indexer 当前开启；关闭臂需要重启。**不是 A/B**（[§7](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)） |
+
+### 头部数字
 
 | 指标 | 数值 |
 |---|---|
-| prefill 峰值 | **3,436.14 t/s**（8192 token 输入，C8） |
-| prefill 长档峰值 | **3,403.66 t/s**（32768 token 输入，C4） |
-| 单流 decode 峰值 | **99.4 t/s**（coding，C1） |
-| 聚合 decode 峰值 | **460.0 t/s**（prose，C16） |
-| 最坏单流 TTFT | **1,255.67 s**（524288 token 输入，C16 —— 10/16 成功，客户端超时） |
-| GSM8K（200 题） | **0.9600**（192/200）· temp 0.6、8-shot |
+| prefill 峰值 | **[FINAL-METRICS §3](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)** |
+| 单流 decode 峰值 | **83.59 t/s**（code，C1） |
+| 聚合 decode 峰值 | **537.5 t/s**（code，C16） |
+| GSM8K（200 题） | **0.9600**（192/200）· temp 0.6、8-shot · indexer 关 |
 | 引擎冷启 | **345.7 s ≈ 5.8 min**（`tokenizer_e2e`） |
 
-**完整 PR 矩阵**（6 种输入 × 5 种并发 = 30 格，2026-09-17 实测），
-数值为**有效 prefill tok/s**（含排队与混合解码，直到最后一个请求收到首 token）：
+引导解码的代价、chat 与 native 两通道的对照、以及「重复一次提示词值多少」这三件事，
+各自作为独立臂测量，见 [FINAL-METRICS §5](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)
+与 [§8](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)，原始归档就在
+[`data/sd1-20260918/`](data/sd1-20260918/) 里。
 
-| 输入 token | C=1 | C=2 | C=4 | C=8 | C=16 |
-|---:|---:|---:|---:|---:|---:|
-| 512 | 1324.60 | 1443.17 | 2525.14 | 2896.32 | 2357.95 |
-| 2048 | 2554.66 | 2970.29 | 3112.65 | 3200.83 | 3154.90 |
-| 8192 | 3238.14 | 3342.89 | 3356.75 | **3436.14** | 3388.08 |
-| 32768 | 3351.81 | 3259.12 | 3403.66 | 3428.73 | 3391.31 |
-| 131072 | 3113.18 | 3003.73 | 3109.48 | 2951.56 | 2959.88 |
-| 524288 | 2283.67 | 2248.99 | 2265.39 | 2304.64 | 2280.40 |
-
-每请求 decode、TTFT 与共享窗聚合列见完整文档。
-
-**完整 DE 矩阵**（512 token 输入、4096 token 预算，**聚合 decode tok/s**）：
-
-| 任务 | C=1 | C=2 | C=4 | C=8 | C=16 |
-|---|---:|---:|---:|---:|---:|
-| coding | 99.4 | 136.7 | 171.6 | 213.5 | 339.0 |
-| json | 77.2 | 117.3 | 159.2 | 207.7 | 336.9 |
-| prose | 43.4 | 86.0 | 107.6 | 263.3 | **460.0** |
-| coding *（xgrammar 约束）* | 89.5 | 115.9 | 182.6 | 210.4 | **367.2** |
-| json *（xgrammar 约束）* | 30.2 | 66.5 | 126.2 | 183.5 | 269.8 |
-
-**结构化输出在低并发是净损失**（coding C1：99.4 → 89.5 tok/s，−10.0 %），
-**在高并发才回本**（coding C16：339.0 → 367.2，+8.3 %）；json 全档落后（C16 −19.9 %）。
-逐格差值见完整文档。
-
-### DE v3 —— sparkDash 对齐口径（2026-09-18，修正后的读法）✅
-
-上面两张 DE 表回答不了「哪种输出**形态**最快」：约束行每 token 都要付 xgrammar mask
-（其他行都没有的负载），自由行用的又是不同提示词、单波次。`de_matrix_v3.py` 按
-sparkDash 自己的协议重测四种形态——提示词标签、**零 grammar**、`min_tokens=max_tokens +
-ignore_eos + stop=[]` 强制吃满预算、temp 0 / top_p 1 / 关思考、3 waves、统一聚合规则——
-并与 sparkDash 经 `:8001` 的自测交叉核对（+0.7 %）。完整矩阵见
-[FINAL-METRICS §4b](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)；
-根因与验证见 [`benchmarks/README.md`](benchmarks/README.md) §7。
-
-**聚合 decode tok/s**（`max_tokens=2048`）：
-
-| 类型 | C=1 | C=2 | C=4 | C=8 | C=16 |
-|---|---:|---:|---:|---:|---:|
-| code | 84.3 | 130.2 | 229.8 | 320.5 | **562.9** |
-| json | 78.1 | 125.1 | 193.8 | 268.5 | 472.0 |
-| structured | 83.0 | 115.9 | 114.7 | 188.5 | 302.6 |
-| prose | 47.4 | 71.0 | 100.0 | 132.1 | 206.3 |
-
-**排序：所有并发档均为 code > json > structured > prose。** 结构化**形态**的 decode
-比散文更快——token 致密、可预测性强，DSpark 投机收益更大。此前「结构化不如散文」
-的观感，是拿 grammar 约束负载与自由生成负载相除的产物；那个差距是**引导解码的代价**
-（json C1：78.1 → 30.2 t/s，−61 %），不是模型性质。
-
-**结构化输出两个坑**（均已复现）：
-
-1. 🔴 `sampling_params.json_schema` 传 **dict 会把引擎打崩**
-   （xgrammar `TypeError: unhashable type: 'dict'` → scheduler 死 → 容器 exit 247）。
-   **必须传 JSON 字符串。** 任何调用方经服务网关传 dict 形态 `response_format`
-   都可能触发全栈重启——**上游未修**。
-2. 🟠 grammar 约束下 `ignore_eos=True` **失效**：schema 可终止时 EOS 照常触发。
-   要吃满 token 预算，schema 必须带 `minItems` 等不可提前满足的约束。
+**结构化输出两个坑** —— `sampling_params.json_schema` 传 **dict 会把引擎打崩**；grammar 之下
+`ignore_eos=True` **不再绝对**（schema 可满足时仍会发 EOS）。两者都在 native `/generate`
+路径上复现；机理与处置见 [benchmarks/README.md §3.1](benchmarks/README.md)。
 
 ---
 
@@ -139,10 +128,13 @@ ignore_eos + stop=[]` 强制吃满预算、temp 0 / top_p 1 / 关思考、3 wave
 | `DSV41_CACHE_GIB=1` / 16-way | Engram 行缓存：命中率 0 → 99.1 %，c12 +6 %，prefill 100K +10.5 % |
 | `DSV41_SHARED_PAD_K=1` | 上游 PR#17：让共享专家 K=576 的形状重回 b12x（逐位无损） |
 | static verify | 上游 compact/ragged 模式在 V4.1 上触发 engram target-verify 断言（sgl-project/sglang#39173） |
+| `CHUNKED_PREFILL_SIZE=4096` | 它是 524288 token 提示词**能装下**的原因，也是长提示词 prefill **逐请求串行**的原因。见 [benchmarks/README.md §3.2](benchmarks/README.md) |
 
-**fp4 indexer（`--enable-deepseek-v4-fp4-indexer`）在形态 A 下是开启的。**
-2026-09-17 的评估结果是 −6.4 % / −0.9 % / −3.3 %（c1 / c8 / c16），
-而形态 B 文档写的是"试后回退"。两句话各自对自己的形态成立——该开关是 env 级、可逆的。
+**fp4 indexer（`--enable-deepseek-v4-fp4-indexer`）在形态 A 下是开启的。** 它是 env 级开关，
+形态 B 则在关闭状态下运行；两者是**不同配置**，任何一行的数值都不该拿去和另一形态比。
+能判定它的 A/B 需要重启，属于窗口事项
+（[FINAL-METRICS §7](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)、
+[§11](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)）。
 
 **唯一保留的已知回退**：c6 聚合 260 → 236（−9 %），EP2 的副作用；c8/c12 涨幅远大于此。
 
@@ -234,6 +226,9 @@ b12x 是消费级 Blackwell（SM120/SM121）的 CuTe-DSL 内核库：NVFP4/MXFP4
 六方案横向总表（LuZ / Vision-Exp / GLM 对照）：
 [docs/4DGX-dsv41-基准测试-横向对比-20260912.md](docs/4DGX-dsv41-基准测试-横向对比-20260912.md)。
 
+> **这些数字属于形态 B，与 §2 不可比。** 上下文与池大小不同、并发上限不同、indexer 关闭、
+> 且用的是 SD-1 之前的记账口径。对比文档自己写明了范围。
+
 | 指标 | 数值 |
 |---|---|
 | decode 峰 / 均（code，temp 0） | **100.3 / 81.4** · 99.8 / 81.2 tok/s（OFF · ON） |
@@ -262,14 +257,24 @@ b12x 是消费级 Blackwell（SM120/SM121）的 CuTe-DSL 内核库：NVFP4/MXFP4
 - `adapter/` — SGLang 补丁（Engram 行存储 C++、MXFP8 后端、共享专家 K padding、prefill 缓存钩子）
 - `sglang-overlay/` — graft 到镜像 sglang 树上的融合 DeepSeek-V4 decode 算子（上文第二层）
 - `b12x-site/` — vendor 的 b12x CuTe-DSL 内核库（上文第一层）
-- `scripts/` — SSH 助手、`verify/` 探针集、自愈监控 + systemd 单元、`gate.sh`、`nccl_selfcheck.sh`、`verify_release_artifact.py`（**离线**归档校验器：blob 完整性 + 内容身份，无需集群）
+- `scripts/` — SSH 助手、`verify/` 探针集、自愈监控 + systemd 单元、`gate.sh`、`nccl_selfcheck.sh`、
+  `verify_release_artifact.py`（**离线**归档校验器：blob 完整性 + 内容身份，无需集群），
+  以及三个仓库自检（`check_redaction.py`、`check_relative_links.py`、`check_report_tables.py`）
+- `benchmarks/` — 产出这些表的 harness，附
+  [harness → 归档映射](benchmarks/README.md)、[SD-1 口径](benchmarks/README.md)、
+  [脱敏策略](benchmarks/README.md)、以及
+  [§3.2 引擎 prefill 准入律](benchmarks/README.md)
 - `bench/` — 门禁套件（needle / corruption / termination / code-gate）、vision 门禁、
-  事件矩阵 + 重叠窗分析、散文、GSM8K、第三方形状并发扫描
-- `data/` — **基准原始归档**（PR 30 格、DE 自由文本 15 格、DE 结构化 10 格），
-  保证汇总数字都可独立复算；另含发布件离线审计记录 `data/release-artifact-20260918/`
+  散文、GSM8K、第三方形状扫描、MoE 数值/容量阶梯
+- `data/` — **基准原始归档**，全部在 `data/sd1-20260918/` 下：DE 矩阵（含逐流原始记录）、
+  grammar A/B、fp4 短输出臂、网关 vs 直连、30 格 PR 矩阵（含**引擎自身的逐步计数**）、
+  以及两次 GSM8K；另含发布件离线审计记录 `data/release-artifact-20260918/`。
+  每一个公布的数字都能由这些文件复算——[`data/README.md`](data/README.md) 说明怎么复算，
+  并**点名列出唯一一个不能复算的列**
 - `.env.tp4.example` — 本仓库实际运行的配置（脱敏模板；现网 `.env.tp4` 已 gitignore）
-- `BUILD-IDENTITY.md` — 镜像 ID、SGLang commit、组件版本、发布件哈希
-- `docs/` — 部署方案、上游 ISSUE/PR 调研、基准横向对比、终版指标板、[勘误](docs/ERRATA-2026-09-18.md)
+- `BUILD-IDENTITY.md` — 镜像 ID、SGLang commit、组件版本、发布件哈希，
+  以及用于核对镜像的**内容身份公式**
+- `docs/` — 部署方案、上游 ISSUE/PR 调研、基准横向对比、终版指标板
 
 ---
 
@@ -313,6 +318,13 @@ image config blob），而 123 层的内容完全相同。完整论证、**同�
 
 内部 IP / 主机名已占位符化、API key 已移除（`YOUR_API_KEY`）；站点 `.env.tp4`
 由 `.gitignore` 排除。
+
+**唯一需要掩码而非归类的一项是 `PEER_HCA_RANK0..3`**：在 4 机环网上，那张映射等价于
+物理布线。`.env.tp4.example` 用 `<PINNING>` 加**三步推导**替代，让你能从一次
+`NCCL_DEBUG=INFO` 首启自行推出自己的映射，并用 `./start-tp4.sh ncclcheck` 验证。
+理由、以及**明确不动**的命中清单（通用地址方案、上游作者标识、原厂 HCA 名）见
+[benchmarks/README.md §4](benchmarks/README.md)。
+`scripts/check_redaction.py` 会重扫全部内容，任何阻塞类未归类命中都会以非零码退出。
 
 仓库默认分支是 **`main`**，**适配内容就在 `main` 上**——本仓库是一份独立的工程快照，
 **不是**上游项目的某个分支。上游归属见下表与 [BUILD-IDENTITY.md](BUILD-IDENTITY.md)。
