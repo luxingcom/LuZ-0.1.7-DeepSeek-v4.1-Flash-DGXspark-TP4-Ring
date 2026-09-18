@@ -71,7 +71,7 @@ stream of every wave. Full 20-cell table with aggregates and TTFT in
 > **Read the spread column before comparing two rows.** The cause of `structured`'s
 > spread is *not identified*, and no table here claims one.
 
-### PR prompt-rate matrix (6 input sizes × 5 concurrencies) — [FINAL-METRICS §3](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)
+### PR prompt-rate matrix (7 input sizes × 5 concurrencies, incl. the 4096 supplement) — [FINAL-METRICS §3](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)
 
 Aggregate prefill rate at and above 8192 input tokens is **flat in concurrency** —
 524288 holds 1323–1409 tok/s from C=1 to C=16, and the 16th stream's TTFT is
@@ -100,9 +100,14 @@ seam steps, not violations.**
 
 ### Headline figures
 
+**Total throughput (the two numbers to quote): aggregate decode peak DE 537.5 t/s
+(code, C16) · PR union decode peak 320.2 t/s (512-token prompts, C16).**
+
 | metric | value |
 |---|---|
-| prefill peak | **[FINAL-METRICS §3](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)** |
+| **DE aggregate decode peak (total throughput)** | **537.5 t/s** (code, C16) |
+| **PR aggregate decode peak, union window (total throughput)** | **320.2 t/s** (512 C16) · 4096-token prompts **235.5 t/s** (C16) |
+| prefill peak | **3,327.2 t/s** (8192 C1); 4096-token row 2,300–3,234 t/s (C1→C16, peak 3,233.8 at C4) |
 | single-stream decode peak | **83.59 t/s** (code, C1) |
 | aggregate decode peak | **537.5 t/s** (code, C16) |
 | GSM8K, 200 questions | **0.9600** (192/200) · temp 0.6, 8-shot · indexer off |

@@ -64,7 +64,7 @@ English → **[README.md](README.md)** · 完整文档 → **[docs/](docs/)** ·
 > 超出各自误差棒 —— C1/C2 档只能分辨 `code` 与 `prose` 的首尾。
 > **比较两行之前先看离散度列。** `structured` 的离散成因**未识别**，本仓库不给出解释。
 
-### PR 提示词速率矩阵（6 种输入 × 5 种并发）—— [FINAL-METRICS §3](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)
+### PR 提示词速率矩阵（7 种输入 × 5 种并发，含 4096 补测）—— [FINAL-METRICS §3](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)
 
 **8192 以上各档的聚合 prefill 速率对并发是平的**——524288 档从 C=1 到 C=16 全部落在
 1323–1409 tok/s，第 16 条流的 TTFT 为 **5955 s**——因为引擎在超过 4096 token 的 chunk
@@ -89,9 +89,14 @@ English → **[README.md](README.md)** · 完整文档 → **[docs/](docs/)** ·
 
 ### 头部数字
 
+**总吞吐（引用就引这两个数）：DE 聚合 decode 峰值 537.5 t/s（code，C16）·
+PR union decode 峰值 320.2 t/s（512-token 输入，C16）。**
+
 | 指标 | 数值 |
 |---|---|
-| prefill 峰值 | **[FINAL-METRICS §3](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)** |
+| **DE 聚合 decode 峰值（总吞吐）** | **537.5 t/s**（code，C16） |
+| **PR union decode 峰值（总吞吐）** | **320.2 t/s**（512 C16）· 4096-token 输入 **235.5 t/s**（C16） |
+| prefill 峰值 | **3,327.2 t/s**（8192 C1）；4096 档 2,300–3,234 t/s（C1→C16，峰 3,233.8 @C4） |
 | 单流 decode 峰值 | **83.59 t/s**（code，C1） |
 | 聚合 decode 峰值 | **537.5 t/s**（code，C16） |
 | GSM8K（200 题） | **0.9600**（192/200）· temp 0.6、8-shot · indexer 关 |

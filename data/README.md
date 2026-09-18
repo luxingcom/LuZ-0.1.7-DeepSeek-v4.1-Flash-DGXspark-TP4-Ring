@@ -81,6 +81,16 @@ The pre-restart 25 cells are in `pr-prefix/` on the run host and **not shipped**
   same engine state. n = 2 per arm: enough to exclude an order-of-magnitude penalty,
   **not** enough to exclude a single-digit-percent one.
 
+### `pr/` 4096-token supplement（2026-09-18 补测）
+
+`4096-c{1,2,4,8,16}-w0.json` 五个原始格文件 + 合并后的 `summary.json`（35 格）与
+`TABLE.md`。补测用同一 harness `pr_matrix_v2.py`、同一 SD-1 协议、同一
+`manifest_sha256`（`6627b5b2…`），以独立 OUT_DIR 跑完后并回主 summary（`_meta.note_4096`
+记录合并事实）。动机：4096 恰在 chunk 边界（`input == CHUNKED_PREFILL_SIZE`），
+是同步准入（≤2048）与串行准入（≥8192）之间的过渡档。
+
+---
+
 ## `gsm8k-20260917/` — the two GSM8K runs
 
 200 questions, 8-shot CoT, temp 0.6, concurrency 1, through the `:8003` gateway.

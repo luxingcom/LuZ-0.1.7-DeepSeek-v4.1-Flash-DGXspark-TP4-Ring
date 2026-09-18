@@ -1,10 +1,12 @@
-# Prompt-rate matrix (SD-1)
+# Prompt-rate matrix (SD-1) — merged with 4096-token supplement
 
-Input size is token-exact and the prompt carries a fresh nonce, so no request is served from the radix cache. The output budget is forced (`min_new_tokens = max_new_tokens`, `ignore_eos`), so every stream delivers the full 1,024 tokens and short-stream tails cannot inflate per-stream rates. Synthetic repeated notes; **not a quality test**.
+Input size is token-exact and the prompt carries a fresh nonce, so no request is served from the radix cache. The output budget is forced (min_new_tokens = max_new_tokens, ignore_eos), so every stream delivers the full 1,024 tokens.
 
-**The prefill column scales only for `input <= CHUNKED_PREFILL_SIZE`** (4096 tokens here). Above it a request is chunked and takes the whole step's prefill budget, so it is prefilled one at a time: aggregate prompt-rate collapses to the single-stream chunked rate and TTFT grows with queue position. `Prefills/step (pred)` is `min(C, floor(CHUNK / input))`; `Engine running/queue` are the engine's own counters sampled once a second during the cell, so the prediction can be checked rather than believed.
+**The prefill column scales only for input <= CHUNKED_PREFILL_SIZE (4096 tokens here).** Above it a request is chunked and takes the whole step prefill budget, so it is prefilled one at a time: aggregate prompt-rate collapses to the single-stream chunked rate and TTFT grows with queue position. Prefills/step (pred) = min(C, floor(CHUNK / input)); Engine running/queue are the engine counters sampled once a second during the cell.
 
-`TTFT first/last s` bracket the wave's queue position -- when the median sits between two values an order of magnitude apart it is describing the queue, not the engine. `median decode` is SD-1: per-stream `(ct-1)/(tLast-tFirst)`. `window decode` is the older 129..641 measure, recovered from the retained event log. `agg prefill` = sum(prompt_tokens) / (last first-token - first send).
+TTFT first/last s bracket the wave queue position. median decode is SD-1: per-stream (ct-1)/(tLast-tFirst). window decode is the older 129..641 measure. agg prefill = sum(prompt_tokens) / (last first-token - first send).
+
+**4096-token row**: measured 2026-09-18 as a separate supplement run (same harness pr_matrix_v2.py, same SD-1 protocol, same manifest_sha256), merged into the summary post-hoc. The supplement directory also keeps its own TABLE.md/summary.json.
 
 | Input tokens | C | Prefills/step (pred) | Prefill tok/s (agg) | TTFT first s | Median TTFT s | TTFT last s | Median decode tok/s/req | Window decode tok/s/req | Total decode tok/s (union) | Engine running (min/med/max) | Engine queue (min/med/max) | OK |
 |---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|---:|
@@ -18,6 +20,11 @@ Input size is token-exact and the prompt carries a fresh nonce, so no request is
 | 2048 | 4 | 2 | 1931.70 | 4.14 | 4.19 | 4.24 | 37.91 | 36.70 | 141.70 | 1/4/4 | 0/0/0 | 4/4 |
 | 2048 | 8 | 2 | 2407.70 | 3.25 | 6.03 | 6.80 | 23.67 | 23.85 | 174.00 | 1/8/8 | 0/0/4 | 8/8 |
 | 2048 | 16 | 2 | 2717.90 | 4.14 | 8.49 | 12.05 | 19.53 | 20.09 | 282.40 | 1/16/16 | 0/0/12 | 16/16 |
+| 4096 | 1 | 1 | 2300.20 | 1.78 | 1.78 | 1.78 | 68.09 | 76.30 | 68.10 | 1/1/1 | 0/0/0 | 1/1 |
+| 4096 | 2 | 1 | 3112.10 | 2.55 | 2.59 | 2.63 | 50.66 | 48.62 | 99.10 | 1/2/2 | 0/0/0 | 2/2 |
+| 4096 | 4 | 1 | 3233.80 | 2.50 | 4.36 | 5.07 | 36.89 | 39.62 | 137.00 | 1/4/4 | 0/0/2 | 4/4 |
+| 4096 | 8 | 1 | 3218.50 | 2.56 | 6.86 | 10.18 | 22.81 | 24.57 | 163.40 | 1/8/8 | 0/0/6 | 8/8 |
+| 4096 | 16 | 1 | 3073.50 | 2.53 | 12.66 | 21.31 | 18.40 | 20.44 | 235.50 | 1/16/16 | 0/0/14 | 16/16 |
 | 8192 | 1 | 1 | 3327.20 | 2.46 | 2.46 | 2.46 | 59.67 | 55.22 | 59.70 | 1/1/10 | 0/0/0 | 1/1 |
 | 8192 | 2 | 1 | 2922.20 | 3.62 | 4.62 | 5.61 | 46.32 | 48.87 | 85.80 | 1/2/2 | 0/0/1 | 2/2 |
 | 8192 | 4 | 1 | 2209.00 | 4.20 | 10.36 | 14.83 | 33.28 | 40.26 | 108.70 | 1/4/4 | 0/0/3 | 4/4 |

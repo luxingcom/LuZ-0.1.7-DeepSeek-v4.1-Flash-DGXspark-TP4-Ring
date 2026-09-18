@@ -6,6 +6,10 @@
 > **构建身份**：[`../../BUILD-IDENTITY.md`](../../BUILD-IDENTITY.md)｜**原始归档**：
 > [`../../data/sd1-20260918/`](../../data/sd1-20260918/)｜**harness**：
 > [`../../benchmarks/README.md`](../../benchmarks/README.md)
+>
+> **修订记录**：2026-09-18（二）补测 **4096-token PR 行**（同 harness/协议/manifest，
+> 独立 supplement 目录跑后并回）⇒ §3 由 30 格扩为 **35 格**，§2 补入 PR/DE 总吞吐行；
+> 所有表格由 `render_report_tables.py` 从合并后归档重新机械产出。
 
 ---
 
@@ -102,6 +106,7 @@ GB10 是 UMA：设备页与宿主页**同池**（121.6 GiB）。因此：
 
 | 指标 | 结果 | 溯源 |
 |---|---|---|
+| DE 总吞吐（agg decode 峰值） | **537.5 t/s**（`code` C16） | §4 |
 | DE 单流峰值（2048 预算） | **83.59 t/s/req**（`code` C1） | §4 |
 | DE 单流最低（C16） | **14.80 t/s/req**（`prose` C16） | §4 |
 | DE 聚合峰值（C16） | **537.5 t/s**（`code` C16） | §4 |
@@ -113,14 +118,15 @@ GB10 是 UMA：设备页与宿主页**同池**（121.6 GiB）。因此：
 | 网关 vs 直连 | 三臂均**不可分辨**：prefill **+0.9%**、decode **−0.2%**、wall **+0.3%**（n=2/臂） | §6 |
 | fp4 短输出臂（256 预算，indexer 开） | `code` C1 **88.58**、C16 **36.99**、agg C16 **542.7 t/s** | §7 |
 | 缓存价值 | ⛔ 业主取消（2026-09-18）；PR 对 engram 路径失明的缺口仍在 | §8 |
-| PR prefill 峰值 | >4096 档 **对并发平**（524288 C1→C16 全在 1323–1409 t/s）；512/2048 档受步/秒限制；**准入律三层证据 27/30 严格成立** | §3 |
+| PR 总吞吐（union decode 峰值） | **320.2 t/s**（512 C16）；4096 档 **235.5 t/s**（C16） | §3 |
+| PR prefill 峰值 | **3327.2 t/s**（8192 C1）；**4096 档 agg prefill 2300–3234 t/s**（C1→C16）；>4096 档对并发平（524288 全在 1323–1409）；**准入律三层证据 27/30 严格成立**（4096 补测 5 格另计，附独立证据表） | §3 |
 | GSM8K 质量门 | **0.9600**（192/200，temp 0.6 / 8-shot，**非 greedy**） | §9 |
 
 ---
 
-## §3 PR 矩阵（30 格）
+## §3 PR 矩阵（35 格）
 
-6 个输入尺寸（512 / 2048 / 8192 / 32768 / 131072 / 524288）× 5 个并发（1/2/4/8/16）= **30 格**，
+7 个输入尺寸（512 / 2048 / **4096** / 8192 / 32768 / 131072 / 524288）× 5 个并发（1/2/4/8/16）= **35 格**（4096 行为 2026-09-18 同口径补测，见下），
 `MAXNEW=1024`，输入尺寸 **token 精确**（native `/generate` + `input_ids`，SD-1 唯一例外），
 每请求独立 nonce。
 
@@ -144,6 +150,11 @@ Input size is token-exact; fresh nonce per request; output budget forced to 1024
 | 2,048 | 4 | 2 | 1931.70 | 4.14 | 4.19 | 4.24 | 37.91 | 36.70 | 141.7 | 1/4/4 | 0/0/0 | 4/4 |
 | 2,048 | 8 | 2 | 2407.70 | 3.25 | 6.03 | 6.80 | 23.67 | 23.85 | 174.0 | 1/8/8 | 0/0/4 | 8/8 |
 | 2,048 | 16 | 2 | 2717.90 | 4.14 | 8.49 | 12.05 | 19.53 | 20.09 | 282.4 | 1/16/16 | 0/0/12 | 16/16 |
+| 4,096 | 1 | 1 | 2300.20 | 1.78 | 1.78 | 1.78 | 68.09 | 76.30 | 68.1 | 1/1/1 | 0/0/0 | 1/1 |
+| 4,096 | 2 | 1 | 3112.10 | 2.55 | 2.59 | 2.63 | 50.66 | 48.62 | 99.1 | 1/2/2 | 0/0/0 | 2/2 |
+| 4,096 | 4 | 1 | 3233.80 | 2.50 | 4.36 | 5.07 | 36.89 | 39.62 | 137.0 | 1/4/4 | 0/0/2 | 4/4 |
+| 4,096 | 8 | 1 | 3218.50 | 2.56 | 6.86 | 10.18 | 22.81 | 24.57 | 163.4 | 1/8/8 | 0/0/6 | 8/8 |
+| 4,096 | 16 | 1 | 3073.50 | 2.53 | 12.66 | 21.31 | 18.40 | 20.44 | 235.5 | 1/16/16 | 0/0/14 | 16/16 |
 | 8,192 | 1 | 1 | 3327.20 | 2.46 | 2.46 | 2.46 | 59.67 | 55.22 | 59.7 | 1/1/10 | 0/0/0 | 1/1 |
 | 8,192 | 2 | 1 | 2922.20 | 3.62 | 4.62 | 5.61 | 46.32 | 48.87 | 85.8 | 1/2/2 | 0/0/1 | 2/2 |
 | 8,192 | 4 | 1 | 2209.00 | 4.20 | 10.36 | 14.83 | 33.28 | 40.26 | 108.7 | 1/4/4 | 0/0/3 | 4/4 |
@@ -165,6 +176,8 @@ Input size is token-exact; fresh nonce per request; output budget forced to 1024
 | 524,288 | 8 | 1 | 1322.70 | 403.08 | 1794.81 | 3170.88 | 0.73 | 20.30 | 2.9 | 0/4/8 | 0/3/7 | 8/8 |
 | 524,288 | 16 | 1 | 1408.50 | 387.96 | 3190.08 | 5955.17 | 0.36 | 15.19 | 2.9 | 0/7/16 | 0/9/17 | 16/16 |
 
+**The 4096-token row** was measured 2026-09-18 as a separate supplement run (same harness `pr_matrix_v2.py`, same SD-1 protocol, same `manifest_sha256`), and merged into the archive post-hoc; the supplement directory keeps its own `TABLE.md` / `summary.json` on the machine.
+
 **Per-cell evidence table** (client dispatch spread, engine gauge, and the scheduler's
 per-step `#new-seq` — three independent channels, cursor-attributed, 27/30 strict and
 3 seam page-tail cells explained): [`data/sd1-20260918/pr/engine-evidence.md`](../../data/sd1-20260918/pr/engine-evidence.md).
@@ -176,6 +189,14 @@ restarted 2026-09-18T08:50:44Z after the harness was rebuilt to the DE launch fo
 (payloads prebuilt outside the pool, warm-up, per-cell engine probe); the pre-restart 25
 cells are quarantined in `pr-prefix/` and not shipped. `REQUEST_TIMEOUT=7200` held: the
 worst TTFT (5955 s) stayed under it, but with only ~1245 s of margin.
+
+**4096-token supplement（2026-09-18 补测）**：4096 恰好落在 chunk 边界上
+（`input == CHUNKED_PREFILL_SIZE` ⇒ `Prefills/step = 1`，与 >4096 各行同为逐请求准入），
+是 512/2048（多请求同步）与 8192+（纯串行）之间的**过渡档**，且 prefill 未被
+分块拆步 ⇒ 是全表中**单请求最大仍可整步 prefilled** 的档位。实测：agg prefill
+2300.20 → 3073.50 t/s（C1→C16，C4 峰 3233.80），union decode 68.1 → 235.5 t/s。
+准入律在 5 个补测格上同样成立（running med = 1，queue 随 C 线性涨到 14），
+证据见再生成的 per-cell evidence table 的 4,096 行。
 
 ---
 
