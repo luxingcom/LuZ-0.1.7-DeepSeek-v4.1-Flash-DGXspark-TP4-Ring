@@ -89,7 +89,35 @@ The pre-restart 25 cells are in `pr-prefix/` on the run host and **not shipped**
 记录合并事实）。动机：4096 恰在 chunk 边界（`input == CHUNKED_PREFILL_SIZE`），
 是同步准入（≤2048）与串行准入（≥8192）之间的过渡档。
 
+> ⚠️ **2026-09-18 起本目录的 PR 数值已作废**，作废理由见
+> `../prv3-20260918/` 与 FINAL-METRICS §3。目录保留用于复核，**数值不得引用**。
+
 ---
+
+## `prv3-20260918/` — PR-v3 纯 prefill 总吞吐（现行 PR 归档）
+
+`RUN_TAG=prv3-20260918T2310`，harness `benchmarks/pr_matrix_v3.py`，7 档输入
+（2048 / 4096 / 8192 / 16384 / 32768 / 65536 / 131072）× 5 档并发（1/2/4/8/16）
+= 35 格，**实测 34 格**。
+
+| 文件 | 内容 |
+|---|---|
+| `summary.json` | 34 格逐格结果 + `_meta`（协议、波次、`chunked_prefill_size`、口径原文） |
+| `TABLE.md` | harness 自己渲染的总表 |
+| `CONCURRENCY.md` | `benchmarks/pr_v3_concurrency.py` 的输出：逐格**实测步宽**、簇数、步间中位间隔、准入律吻合判定 |
+| `raw/<input>-c<C>-w0.json` | 34 个逐流原始记录（`t0 / t_first / t_last / t_end / prompt_sha16 / nonce`） |
+
+三条口径硬约束（对应复核提出的三个缺陷）：
+
+1. **排除缓存** —— 每请求唯一 nonce 置提示词最前（radix 永不命中）＋ 每格之间
+   `POST /flush_cache`，flush 失败即中止该格。
+2. **证明并发** —— 见 `CONCURRENCY.md`；结论是 34 格中只有 4 格（2048 × C2/C4/C8/C16）
+   为真并行（步宽 2），其余 23/27 个多流格为串行准入。
+3. **总吞吐** —— `Σ(全部成功流 prompt token) ÷ 墙钟`，墙钟 = 放行第一流 → 最后一流结束；
+   `max_new_tokens=1`（纯 prefill，无 decode 尾巴）。
+
+**未测**：`131072 × C16`（本轮跑到第 34 格时按维护窗口决策停跑——是未测量，不是失败）。
+**已知限制**：每格 1 波 ⇒ 无误差棒。
 
 ## `gsm8k-20260917/` — the two GSM8K runs
 

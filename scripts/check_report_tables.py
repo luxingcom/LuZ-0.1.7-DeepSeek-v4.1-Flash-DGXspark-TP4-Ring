@@ -28,6 +28,7 @@ Exit 0 if every table present in both matches, 1 otherwise. Tables that exist in
 one of the two are reported (that is usually a stage that has not landed yet, which is
 why the report is allowed to say so).
 """
+import json
 import os
 import re
 import subprocess
@@ -78,6 +79,19 @@ def main():
     archive, report = sys.argv[1], sys.argv[2]
     renderer = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                             "benchmarks", "render_report_tables.py")
+    # PR-v3 is a flat archive (summary.json + raw/) produced by pr_matrix_v3.py, so it
+    # needs its own renderer. Keyed on the archive's own declared protocol_id, not on
+    # the directory name, so renaming the directory cannot silently pick the wrong one.
+    declared = os.path.join(archive, "summary.json")
+    if os.path.exists(declared):
+        try:
+            with open(declared, encoding="utf-8") as fh:
+                meta = json.load(fh).get("_meta", {})
+        except (ValueError, OSError):
+            meta = {}
+        if meta.get("protocol_id") == "PR-V3":
+            renderer = os.path.join(os.path.dirname(renderer),
+                                    "render_pr_v3_tables.py")
     if not os.path.exists(renderer):
         print("renderer not found: %s" % renderer)
         return 2

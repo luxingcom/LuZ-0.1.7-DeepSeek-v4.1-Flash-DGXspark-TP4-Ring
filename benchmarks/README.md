@@ -21,14 +21,17 @@ If you want to re-derive a number rather than trust it, start here and in
 |---|---|---|---|
 | `sd_protocol.py` | **the shared protocol module**: `new_nonce()`, `build_prompt()`, `stream_chat` / `stream_generate`, per-stream accounting, `aggregate_wave`, `dump` | — | FINAL-METRICS §1 |
 | `de_matrix_v3.py` | DE matrix, 4 prompt-label types × 5 concurrencies × 3 waves, **no grammar**, force-filled budget | `../data/sd1-20260918/de/` (20 cells + 20 raw records) | FINAL-METRICS §4 |
-| `pr_matrix_v2.py` | prompt-rate matrix, 6 input sizes × 5 concurrencies, token-exact input via native `/generate`, 1 wave. Also samples the engine's running/queue counters every second and records a warm-up before cell 1. Reads §3.2 before you quote a row from it | `../data/sd1-20260918/pr/` (30 cells, per-token event log retained) | FINAL-METRICS §3 |
+| `pr_matrix_v2.py` | ⚠️ **superseded — its archive is withdrawn as a baseline (2026-09-18).** Kept source-only so the withdrawal can be audited: it did not flush the radix cache between cells, could not distinguish parallel prefill from queued prefill, and reported per-stream rates rather than total throughput | `../data/sd1-20260918/pr/` (35 cells) — **numbers must not be quoted** | — |
+| `pr_matrix_v3.py` | **PR-v3, the current PR harness.** Pure-prefill total throughput: `max_new_tokens=1`, fresh nonce per request, `POST /flush_cache` between cells, total = `Σ(prompt tokens) / wall-clock (arm start → last stream end)`. 7 sizes (2048…131072) × 5 concurrencies, 1 wave | `../data/prv3-20260918/` (34 cells + 34 raw per-stream records) | FINAL-METRICS §3 |
+| `pr_v3_concurrency.py` | **re-analysis, not a new measurement.** Clusters the archived per-stream first-token instants to decide whether a cell really prefilled more than one request per step. Needed because `ttft_overlap_peak` is degenerate when `max_new_tokens=1` (`t_end − t_first ≈ 0.1 ms`, so the span sweep can never reach 2) | consumes `../data/prv3-20260918/raw/` | FINAL-METRICS §3.3 |
 | `pr_engine_steps.py` | the **third** evidence channel for the prefill admission law: attributes the scheduler's own `Prefill batch` lines to cells by wall-clock window and tests `max #new-seq`, `sum #new-token == C x input` and `max #queue-req` against the prediction | `../data/sd1-20260918/pr/engine-steps.log` (the pr-window lines) + a per-cell table | FINAL-METRICS §3 |
 | `grammar_ab.py` | guided-decoding cost: `sampling_params.json_schema` present vs absent, same prompt body, separate nonces | `../data/sd1-20260918/grammar/`, `.../grammar2/` | FINAL-METRICS §5.1 |
 | `gw_ab_v2.py` | the `:8001` gateway vs direct `:8899`, three arms (prefill / decode / **wall, not streamed**) | `../data/sd1-20260918/gw/` | FINAL-METRICS §6 |
 | `cache_effect_probe.py` | **what a repeated prompt is worth**, at 2k / 32k / 131k | `../data/sd1-20260918/cache/` | FINAL-METRICS §8 |
 | `channel_ab.py` | chat channel vs native `/generate` on an identical unconstrained prompt, alternated within each wave | `../data/sd1-20260918/channel/` | FINAL-METRICS §5.2 |
 | `preflight_sd1.py` | 5 protocol checks, including the **nonce regression gate** (§8) | — | §8 |
-| `render_report_tables.py` | renders **every** table in FINAL-METRICS §3–§8 from the archives. Exits non-zero and names the missing stage rather than emitting an empty table | `../data/sd1-20260918/TABLES.generated.md` | FINAL-METRICS §3–§8 |
+| `render_report_tables.py` | renders the tables in FINAL-METRICS §4–§8 from the SD-1 archives. Exits non-zero and names the missing stage rather than emitting an empty table | `../data/sd1-20260918/TABLES.generated.md` | FINAL-METRICS §4–§8 |
+| `render_pr_v3_tables.py` | renders the two PR-v3 tables (34-cell per-cell, and the 7×5 compressed view) from `data/prv3-20260918/`. Recomputes the concurrency columns from the raw per-stream files, so it does **not** trust `ttft_overlap_peak` | — | FINAL-METRICS §3 |
 | `run_sd1_all.sh` | the staged main chain (`de → grammar → fp4_256 → gw → pr`), each stage its own `docker exec`, with a 30 s UMA memory sampler. `STAGES=` runs a subset and `TAG=` reuses a run directory, so a harness change invalidates one stage rather than five | the run directory itself | — |
 | `run_sd1_extra.sh` | the closure stages (`cache → channel → grammar2`), run **after** the main chain | appends into the same run directory | — |
 | `common_window.py` | re-analysis: delivered throughput while every stream in a wave overlaps | consumes raw per-cell records | (see §6) |
@@ -236,6 +239,27 @@ limited by **steps per second, not tokens per second**. The step costs about the
 whether it carries 2048 tokens or 4096, so a 2048-token cell at C=2 returns roughly twice
 the aggregate prefill of C=1 while using the same number of steps. Above the chunk size
 both effects disappear into "one request at a time".
+
+**Re-verified 2026-09-18 on PR-v3 — and one trap worth recording.** `pr_matrix_v3.py`
+ships two concurrency signals, and **neither is usable as shipped**:
+
+- `ttft_overlap_peak` is **degenerate** under `max_new_tokens=1`. The single emitted
+  token *is* the first token, so `t_end − t_first ≈ 0.1 ms`, and a `[t_first, t_end]`
+  sweep can never reach 2 — every cell reports 1 no matter what the engine actually did.
+  It is not evidence of serialization; it is an artefact of the output budget.
+- `gauge_parallel` reads `sglang:num_running_reqs`, a **1 s sampler**. A 2048 × C1 cell
+  lasts 0.84 s and can be missed entirely, so "the gauge never saw >1" is not proof
+  either.
+
+The verdict therefore comes from `pr_v3_concurrency.py`, which clusters the archived
+per-stream **first-token instants** instead — a stream that shared a prefill step emits
+its first token at the same wall instant as its step-mates, and a serialized stream is
+one service-time away. The tolerance is derived from the data rather than picked:
+within-step jitter is ≤ **0.5 ms** and the smallest between-step gap is **64 ms**, so
+10 ms sits inside a two-order-of-magnitude separation. The verdict is stable for any
+tolerance in 0.005–0.05 s and only flips 7 cells at ≥ 0.2 s. On that basis the law holds
+**34/34** on PR-v3 — including the 2048 row, where the observed width is genuinely 2
+(`floor(4096/2048)`) and is the *only* place in the matrix with real parallel prefill.
 
 ---
 

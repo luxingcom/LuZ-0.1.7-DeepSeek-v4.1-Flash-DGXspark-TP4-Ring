@@ -71,25 +71,44 @@ stream of every wave. Full 20-cell table with aggregates and TTFT in
 > **Read the spread column before comparing two rows.** The cause of `structured`'s
 > spread is *not identified*, and no table here claims one.
 
-### PR prompt-rate matrix (7 input sizes × 5 concurrencies, incl. the 4096 supplement) — [FINAL-METRICS §3](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)
+### PR — pure-prefill total throughput (PR-v3, 34 of 35 cells) — [FINAL-METRICS §3](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)
 
-Aggregate prefill rate at and above 8192 input tokens is **flat in concurrency** —
-524288 holds 1323–1409 tok/s from C=1 to C=16, and the 16th stream's TTFT is
-**5955 s** — because the engine admits prefill one request at a time above the
-4096-token chunk size. Three independent evidence channels (client dispatch spread
-0–697 ms with `peak_client_overlap == C` everywhere, the engine's own running/queue
-gauges, and the scheduler's per-step `#new-seq`) agree: **27/30 cells match the
-admission law `min(C, floor(4096/input))` exactly, and the 3 exceptions are page-size
-seam steps, not violations.**
+> ⚠️ **The PR table was re-measured and rewritten on 2026-09-18.** The previous PR
+> matrix (PR-v2) is **withdrawn as a baseline** — it did not flush the radix cache
+> between cells, it could not distinguish parallel prefill from queued prefill, and
+> its columns were per-stream rates rather than total throughput. The old archive is
+> kept under [`data/sd1-20260918/pr/`](data/sd1-20260918/pr/) so the withdrawal can
+> be audited, but **its numbers must not be quoted**.
 
-> ⚠️ **This is the one table whose column names invite a wrong reading, so read
-> [benchmarks/README.md §3.2](benchmarks/README.md) first.** The engine runs
-> `--chunked-prefill-size 4096`, and above that prompt length the scheduler gives the
-> in-flight chunked request the whole step's prefill budget. Prefill therefore advances
-> **one request at a time** for any input > 4096 tokens — the aggregate prompt-rate column
-> collapses to the single-stream chunked rate, and `median TTFT` at C>1 is a
-> queue-position figure, not an engine latency. The matrix carries the engine's own
-> running/queue counters per cell so this is measured rather than asserted.
+PR-v3 measures what a load generator actually cares about: **total prompt tokens
+divided by the wall clock from releasing the first stream to the last stream
+finishing**, with `max_new_tokens=1` (pure prefill, no decode tail), a fresh nonce on
+every request and a `POST /flush_cache` between cells.
+
+| Input tokens | C1 | C2 | C4 | C8 | C16 |
+|---:|---:|---:|---:|---:|---:|
+| 2,048 | 2441.6 | 3062.6 | **3157.1** | 3144.4 | 2878.4 |
+| 4,096 | 2810.5 | 3229.2 | 3296.1 | **3310.3** | 2913.6 |
+| 8,192 | **3337.6** | 2598.3 | 2428.1 | 2700.8 | 2458.0 |
+| 16,384 | 1936.6 | 1941.6 | 2014.9 | 2095.5 | **2140.2** |
+| 32,768 | **2214.1** | 2134.4 | 2044.9 | 2168.6 | 2097.9 |
+| 65,536 | 1924.9 | 1944.6 | **2215.5** | 2035.9 | 1986.8 |
+| 131,072 | **1775.9** | 1739.5 | 1764.9 | 1739.3 | ⛔ not measured |
+
+**Is it really concurrent, or just queued?** Answered per cell from the archived
+per-stream first-token instants, not from a sampled counter
+([`benchmarks/pr_v3_concurrency.py`](benchmarks/pr_v3_concurrency.py)): only **4 of
+34 cells** show a genuinely parallel prefill step — all at 2,048 tokens, width 2.
+Every other multi-stream cell (**23 of 27**) ran **one request at a time**, because
+`--chunked-prefill-size 4096` admits `min(C, floor(4096/input))` requests per step;
+the admission law matches **34/34** cells. So apart from the 2,048 row, these totals
+are the wall-clock throughput of **serialized admission**, not of parallel prefill.
+That is an engine policy, not a client defect and not a queue timeout.
+
+Consequences: concurrency pays off only at 2,048 (**+29.3 %**, C1→C4); at 8,192 it is
+negative (**−26.4 %**, C1→C16). Long inputs converge into a narrow band — 32,768 /
+65,536 / 131,072 all land inside 1,739–2,216 tok/s. One wave per cell means **no
+error bar**, so gaps inside that band are unresolved rather than ranked.
 
 ### Gateway and short-output arms
 
@@ -100,16 +119,15 @@ seam steps, not violations.**
 
 ### Headline figures
 
-**Total throughput (the two numbers to quote): aggregate decode peak DE 537.5 t/s
-(code, C16) · PR union decode peak 320.2 t/s (512-token prompts, C16).**
+**Total throughput — the two numbers to quote: DE aggregate decode peak 537.5 t/s
+(code, C16) · PR pure-prefill total throughput peak 3,337.6 t/s (8192 × C1).**
 
 | metric | value |
 |---|---|
 | **DE aggregate decode peak (total throughput)** | **537.5 t/s** (code, C16) |
-| **PR aggregate decode peak, union window (total throughput)** | **320.2 t/s** (512 C16) · 4096-token prompts **235.5 t/s** (C16) |
-| prefill peak | **3,327.2 t/s** (8192 C1); 4096-token row 2,300–3,234 t/s (C1→C16, peak 3,233.8 at C4) |
+| **PR total throughput peak (pure prefill, PR-v3)** | **3,337.6 t/s** (8192 × C1) · best multi-stream cell **3,310.3 t/s** (4096 × C8) |
+| PR concurrency verdict | real parallel step only at 2,048 tokens (width 2, 4/34 cells); 23/27 multi-stream cells serialized |
 | single-stream decode peak | **83.59 t/s** (code, C1) |
-| aggregate decode peak | **537.5 t/s** (code, C16) |
 | GSM8K, 200 questions | **0.9600** (192/200) · temp 0.6, 8-shot · indexer off |
 | engine cold start | **345.7 s ≈ 5.8 min** (`tokenizer_e2e`) |
 
