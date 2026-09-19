@@ -26,7 +26,10 @@ not modified and the archived numbers are not re-measured.
 
 Usage
 -----
-    python3 pr_v3_concurrency.py <dir-with-*-c<N>-w0.json> [tolerance_s]
+    python3 pr_v3_concurrency.py <dir-with-*-c<N>-w0.json> [tolerance_s] [chunk_size]
+
+`chunk_size` defaults to 4096 (the value the 2026-09-18 archive was measured at);
+pass 8192 for the 2026-09-19 re-run (`data/prv3-v14-20260919/`).
 
 Prints one row per cell: input, C, predicted admission width, observed cluster
 count, max cluster size (= observed parallel width), median inter-cluster gap,
@@ -38,7 +41,7 @@ import statistics
 import sys
 from pathlib import Path
 
-CHUNKED_PREFILL_SIZE = 4096
+DEFAULT_CHUNK = 4096
 
 # Two orders of magnitude separate "same scheduler step" from "next step":
 #   within-step jitter (streams that really shared one prefill step): <= 0.5 ms
@@ -49,11 +52,9 @@ CHUNKED_PREFILL_SIZE = 4096
 DEFAULT_TOL = 0.010
 
 
-def predicted_width(input_tokens, conc):
-    """chunked-prefill admission law: min(C, floor(CHUNK / input))."""
-    per_step = CHUNKED_PREFILL_SIZE // input_tokens
-    if per_step < 1:
-        per_step = 1  # longer than the chunk: chunked, one request per step
+def predicted_width(input_tokens, conc, chunk):
+    """chunked-prefill admission law: min(C, max(1, floor(chunk / input)))."""
+    per_step = max(1, chunk // input_tokens)
     return min(conc, per_step)
 
 
@@ -72,6 +73,7 @@ def clusters(values, tol):
 def main():
     root = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(".")
     tol = float(sys.argv[2]) if len(sys.argv) > 2 else DEFAULT_TOL
+    chunk = int(sys.argv[3]) if len(sys.argv) > 3 else DEFAULT_CHUNK
 
     files = sorted(root.glob("*-c*-w0.json"))
     if not files:
@@ -91,7 +93,7 @@ def main():
         size = int(f.name.split("-c")[1].split("-")[0])
         inp = ok[0].get("input_tokens") or ok[0].get("prompt_tokens")
         conc = len(recs)
-        pred = predicted_width(inp, conc)
+        pred = predicted_width(inp, conc, chunk)
         width = max(len(c) for c in cl)
         rows.append({
             "file": f.name,
@@ -109,7 +111,7 @@ def main():
 
     rows.sort(key=lambda r: (r["input_tokens"], r["concurrency"]))
 
-    print(f"tolerance = {tol}s   chunked_prefill_size = {CHUNKED_PREFILL_SIZE}")
+    print(f"tolerance = {tol}s   chunked_prefill_size = {chunk}")
     print()
     print("| Input | C | predicted width | observed width | clusters | median gap s | "
           "max within-cluster spread s | admission law holds |")
@@ -122,7 +124,7 @@ def main():
     n_match = sum(1 for r in rows if r["match"])
     print()
     print(f"admission law: {n_match}/{len(rows)} cells match "
-          f"min(C, floor({CHUNKED_PREFILL_SIZE}/input)) exactly")
+          f"min(C, max(1, floor({chunk}/input))) exactly")
     parallel = [r for r in rows if r["observed_width"] >= 2]
     print(f"cells with a real parallel step (observed width >= 2): "
           f"{len(parallel)}/{len(rows)}")

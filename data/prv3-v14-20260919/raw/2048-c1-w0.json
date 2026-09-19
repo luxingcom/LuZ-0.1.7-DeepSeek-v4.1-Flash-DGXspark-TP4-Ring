@@ -1,0 +1,26 @@
+[
+ {
+  "type": "pr",
+  "conc": 1,
+  "index": 0,
+  "wave": 0,
+  "prompt_chars": 0,
+  "error": null,
+  "input_tokens": 2048,
+  "prompt_sha16": "6507153c40652505",
+  "t0": 1789827127.506363,
+  "t_first": 1789827128.290729,
+  "t_last": 1789827128.290729,
+  "t_end": 1789827128.290899,
+  "prompt_tokens": 2048,
+  "completion_tokens": 1,
+  "output_chars": 0,
+  "ttft_s": 0.7844,
+  "wall_s": 0.7845,
+  "decode_s": 0.0,
+  "prefill_tps": 2610.9,
+  "chars_per_token": 0.0,
+  "nonce": "prv3-v14-final-0-6cc93755",
+  "manifest_sha256": "8deaffae12fc2529e9737e0837efd41da3ccfbff7ce5bce419c7d97126db89b6"
+ }
+]
