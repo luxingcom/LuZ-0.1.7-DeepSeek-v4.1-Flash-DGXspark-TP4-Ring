@@ -1,5 +1,10 @@
 # LuZ-0.1.7-DSV41F · DeepSeek-V4.1-Flash on 4× DGX Spark · TP4 switchless RoCE ring
 
+**Repo version: v0.2.3** (2026-09-19) — see the
+[release notes](docs/release-notes/RELEASE-NOTES-v0.2.3.md). Image identity is
+unchanged since v0.2.2: still `dsv41-sglang-optimized:v7`, content identity
+`4ebef21b6aedbd70`.
+
 Production recipe for serving **deepseek-ai/DeepSeek-V4.1-Flash** — a ~550 B-parameter
 MoE (40 layers, 384 routed experts/layer, top-6 routing + 1 shared expert, MXFP4
 expert weights, 1 M native context, DSpark speculative decoding) — with **SGLang TP4
@@ -71,14 +76,17 @@ stream of every wave. Full 20-cell table with aggregates and TTFT in
 > **Read the spread column before comparing two rows.** The cause of `structured`'s
 > spread is *not identified*, and no table here claims one.
 
-### PR — pure-prefill total throughput (PR-v3, 34 of 35 cells) — [FINAL-METRICS §3](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)
+### PR — pure-prefill total throughput (PR-v3, all 40 cells) — [FINAL-METRICS §3](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)
 
-> ⚠️ **The PR table was re-measured and rewritten on 2026-09-18.** The previous PR
-> matrix (PR-v2) is **withdrawn as a baseline** — it did not flush the radix cache
-> between cells, it could not distinguish parallel prefill from queued prefill, and
-> its columns were per-stream rates rather than total throughput. The old archive is
-> kept under [`data/sd1-20260918/pr/`](data/sd1-20260918/pr/) so the withdrawal can
-> be audited, but **its numbers must not be quoted**.
+> ⚠️ **The PR table was re-measured twice and rewritten.** The PR-v2 matrix was
+> withdrawn as a baseline on 2026-09-18 (no cache flush, parallel-vs-queued
+> indistinguishable, per-stream columns); the first PR-v3 pass (34/35 cells,
+> `--chunked-prefill-size 4096`, peak 3,337.6 t/s at 8192×C1) was in turn **superseded
+> on 2026-09-19** by a full re-run at **`--chunked-prefill-size 8192`**: 40/40 cells
+> (8 input sizes × 5 concurrencies, 512 row added, 131072×C16 completed). Both
+> superseded archives are kept under [`data/sd1-20260918/pr/`](data/sd1-20260918/pr/)
+> and [`data/prv3-20260918/`](data/prv3-20260918/) for audit; **quote the v14 table
+> below and nothing else**.
 
 PR-v3 measures what a load generator actually cares about: **total prompt tokens
 divided by the wall clock from releasing the first stream to the last stream
@@ -87,28 +95,36 @@ every request and a `POST /flush_cache` between cells.
 
 | Input tokens | C1 | C2 | C4 | C8 | C16 |
 |---:|---:|---:|---:|---:|---:|
-| 2,048 | 2441.6 | 3062.6 | **3157.1** | 3144.4 | 2878.4 |
-| 4,096 | 2810.5 | 3229.2 | 3296.1 | **3310.3** | 2913.6 |
-| 8,192 | **3337.6** | 2598.3 | 2428.1 | 2700.8 | 2458.0 |
-| 16,384 | 1936.6 | 1941.6 | 2014.9 | 2095.5 | **2140.2** |
-| 32,768 | **2214.1** | 2134.4 | 2044.9 | 2168.6 | 2097.9 |
-| 65,536 | 1924.9 | 1944.6 | **2215.5** | 2035.9 | 1986.8 |
-| 131,072 | **1775.9** | 1739.5 | 1764.9 | 1739.3 | ⛔ not measured |
+| 512 | 1211.1 | 1316.0 | 1845.5 | 2311.5 | **2468.9** |
+| 2,048 | 2607.5 | 2652.0 | **2899.7** | 2451.1 | 2705.8 |
+| 4,096 | 3111.8 | **3288.5** | 2871.8 | 3107.0 | 2931.8 |
+| 8,192 | 2667.5 | 2849.1 | **3326.4** | 3087.8 | 2863.1 |
+| 16,384 | **3025.7** | 2516.1 | 2183.4 | 2171.2 | 1915.1 |
+| 32,768 | **1963.0** | 1688.3 | 1704.9 | 1650.1 | 1690.4 |
+| 65,536 | **1697.3** | 1463.4 | 1487.6 | 1497.7 | 1537.3 |
+| 131,072 | **1770.0** | 1795.7 | 1536.7 | 1366.9 | 1560.2 |
 
 **Is it really concurrent, or just queued?** Answered per cell from the archived
 per-stream first-token instants, not from a sampled counter
-([`benchmarks/pr_v3_concurrency.py`](benchmarks/pr_v3_concurrency.py)): only **4 of
-34 cells** show a genuinely parallel prefill step — all at 2,048 tokens, width 2.
-Every other multi-stream cell (**23 of 27**) ran **one request at a time**, because
-`--chunked-prefill-size 4096` admits `min(C, floor(4096/input))` requests per step;
-the admission law matches **34/34** cells. So apart from the 2,048 row, these totals
-are the wall-clock throughput of **serialized admission**, not of parallel prefill.
-That is an engine policy, not a client defect and not a queue timeout.
+([`benchmarks/pr_v3_concurrency.py`](benchmarks/pr_v3_concurrency.py)). Under
+`chunk=8192` the admission law `min(C, max(1, floor(8192/input)))` holds exactly in
+**35/40 cells** — and **no cell ever exceeds it**; the five shortfalls are arrival
+effects in tiny-prompt cells (a 512-token wave spans ~6 ms while a scheduler step is
+sub-millisecond), not policy violations. Real parallel prefill steps appear in **11
+cells** (512: width up to 13 · 2048: width up to 4 · 4096: width 2); above 4,096
+tokens every multi-stream cell (**21 of 32**) still ran **one request at a time**,
+because a prompt longer than the step budget occupies the scheduler alone. So the
+upper rows of this table are genuinely parallel, and the long-input rows are the
+wall-clock throughput of **serialized admission** — an engine policy, not a client
+defect.
 
-Consequences: concurrency pays off only at 2,048 (**+29.3 %**, C1→C4); at 8,192 it is
-negative (**−26.4 %**, C1→C16). Long inputs converge into a narrow band — 32,768 /
-65,536 / 131,072 all land inside 1,739–2,216 tok/s. One wave per cell means **no
-error bar**, so gaps inside that band are unresolved rather than ranked.
+Consequences: at 512–4096 tokens, concurrency pays everywhere (512-row **+103.9 %**
+C1→C16 — a row the 4096-chunk runs never covered); the old flat-8192-row pattern is
+gone — the 8,192 row now peaks at **C4** (TTFT is flat ≈2.5 s across C4–C16 while
+total t/s rises to 3,326.4); 16,384×C1 gains **+56.2 %** over the 4096-chunk build.
+Above 32 K, inputs still converge into a narrow band — 1,367–1,963 tok/s. One wave
+per cell means **no error bar**, so gaps inside that band are unresolved rather than
+ranked.
 
 ### Gateway and short-output arms
 
@@ -120,13 +136,14 @@ error bar**, so gaps inside that band are unresolved rather than ranked.
 ### Headline figures
 
 **Total throughput — the two numbers to quote: DE aggregate decode peak 537.5 t/s
-(code, C16) · PR pure-prefill total throughput peak 3,337.6 t/s (8192 × C1).**
+(code, C16) · PR pure-prefill total throughput peak 3,326.4 t/s (8192 × C4,
+chunk 8192).**
 
 | metric | value |
 |---|---|
 | **DE aggregate decode peak (total throughput)** | **537.5 t/s** (code, C16) |
-| **PR total throughput peak (pure prefill, PR-v3)** | **3,337.6 t/s** (8192 × C1) · best multi-stream cell **3,310.3 t/s** (4096 × C8) |
-| PR concurrency verdict | real parallel step only at 2,048 tokens (width 2, 4/34 cells); 23/27 multi-stream cells serialized |
+| **PR total throughput peak (pure prefill, PR-v3 @ chunk 8192)** | **3,326.4 t/s** (8192 × C4) · runner-up **3,288.5 t/s** (4096 × C2) · best small-prompt cell **2,468.9 t/s** (512 × C16) |
+| PR concurrency verdict | real parallel steps in 11/40 cells (512 up to width 13 · 2048 up to 4 · 4096 width 2); 21/32 multi-stream cells above 4096 tokens serialized |
 | single-stream decode peak | **83.59 t/s** (code, C1) |
 | GSM8K, 200 questions | **0.9600** (192/200) · temp 0.6, 8-shot · indexer off |
 | engine cold start | **345.7 s ≈ 5.8 min** (`tokenizer_e2e`) |
@@ -165,7 +182,7 @@ are in [benchmarks/README.md §3.1](benchmarks/README.md).
 | `DSV41_CACHE_GIB=1` / 16-way | Engram row cache: hit rate 0 → 99.1 %, c12 +6 %, prefill 100 K +10.5 % |
 | `DSV41_SHARED_PAD_K=1` | upstream PR #17: keeps the shared expert's K=576 shape eligible for b12x (bit-identical) |
 | static verify mode | upstream compact/ragged mode trips an engram target-verify assertion on V4.1 (sgl-project/sglang#39173) |
-| `CHUNKED_PREFILL_SIZE=4096` | what makes a 524288-token prompt fit at all — and the reason long-prompt prefill is serialized one request at a time. See [benchmarks/README.md §3.2](benchmarks/README.md) |
+| `CHUNKED_PREFILL_SIZE=4096` (production) | what makes a 524288-token prompt fit at all — and the reason long-prompt prefill is serialized one request at a time. **The 2026-09-19 PR benchmark re-run was measured at 8192** (a benchmark form, not a production change — the launcher now validates `{2048, 4096, 6144, 8192}`); see [benchmarks/README.md §3.2](benchmarks/README.md) and the note in [FINAL-METRICS §1.4](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md) |
 
 **fp4 indexer (`--enable-deepseek-v4-fp4-indexer`) is ON** in Form A. It is an
 env-level switch and Form B runs with it off; the two forms are different
@@ -316,6 +333,11 @@ Full six-stack comparison incl. LuZ / Vision-Exp / GLM:
 - `sglang-overlay/` — the fused DeepSeek-V4 decode operators grafted over the image's
   sglang tree (Layer 2 above)
 - `b12x-site/` — vendored b12x CuTe-DSL kernel library (Layer 1 above)
+- `gateway/` — **streaming-aware concurrency proxy** (the `:8001` gateway in front of
+  the engine): SSE heartbeat, TTFT budget, backpressure admission, equivalence
+  dedup, disconnect propagation, `/gw/metrics`, optional `enable_thinking` injection.
+  Ships a sanitized `.env.example` (all 13 knobs documented) and a systemd unit
+  sample; no internal hostnames, ports or URLs
 - `scripts/` — SSH helper, `verify/` probe kit, self-heal monitor + systemd unit,
   `gate.sh`, `nccl_selfcheck.sh`, `verify_release_artifact.py` (**offline** archive
   verifier: blob integrity + content identity, no cluster needed), and the three
@@ -328,10 +350,12 @@ Full six-stack comparison incl. LuZ / Vision-Exp / GLM:
   [§3.2 on the engine's prefill admission law](benchmarks/README.md)
 - `bench/` — gate suite (needle / corruption / termination / code-gate), vision gate,
   prose, GSM8K, third-party-shaped sweep, MoE numeric/capacity ladders
-- `data/` — **raw benchmark archives** under `data/sd1-20260918/`: the DE matrix with
-  per-stream records, the grammar A/B, the fp4 short-output arm, gateway-vs-direct, the
-  30-cell PR matrix with the engine's own per-step counters, and the two GSM8K runs —
-  plus the recorded offline audit of the release archive
+- `data/` — **raw benchmark archives** under `data/sd1-20260918/` (DE matrix with
+  per-stream records, the grammar A/B, the fp4 short-output arm, gateway-vs-direct,
+  and the two GSM8K runs) plus **`data/prv3-v14-20260919/`** — the current PR-v3
+  matrix, 40/40 cells at `chunk 8192` with per-stream raw records — and the two
+  superseded PR archives kept for audit (`data/prv3-20260918/`, `data/sd1-20260918/pr/`),
+  and the recorded offline audit of the release archive
   (`data/release-artifact-20260918/`). Every published figure is re-derivable from these
   files; [`data/README.md`](data/README.md) says how, and names the one column that is
   not
@@ -339,8 +363,8 @@ Full six-stack comparison incl. LuZ / Vision-Exp / GLM:
   `.env.tp4` is gitignored)
 - `BUILD-IDENTITY.md` — image IDs, SGLang commit, component versions, artifact hashes,
   and the exact identity formula to check an image against
-- `docs/` — deployment plan, upstream ISSUE/PR survey, benchmark comparison, and the
-  final metrics board
+- `docs/` — deployment plan, upstream ISSUE/PR survey, benchmark comparison, the
+  final metrics board, and the [release notes](docs/release-notes/)
 
 ---
 

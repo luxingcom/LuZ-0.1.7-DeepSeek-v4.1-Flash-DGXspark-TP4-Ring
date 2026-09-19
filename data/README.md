@@ -30,7 +30,7 @@ directory on the head node carries each stage's start, exit code and elapsed tim
 | `grammar/` | guided-decoding A/B, 5 concurrencies × 2 arms × 3 waves, **with the per-stream records** | ✅ complete |
 | `fp4_256/` | fp4-indexer short-output arm, 256-token budget, `code` type, C=1/8/16 | ✅ complete (**one arm**: the indexer is on) |
 | `gw/` | `:8001` gateway vs direct `:8899`, three arms (prefill / decode / wall), `ROUNDS=2` | ✅ complete |
-| `pr/` | prompt-rate matrix, 6 input sizes × 5 concurrencies = **30 cells**, token-exact input via native `/generate`, plus `engine-steps.log` (the engine's own per-step prefill/decode counters for the same window) and a per-cell `engine_probe` in `summary.json` | ⏳ collecting |
+| `pr/` | prompt-rate matrix (PR-v2), 6 input sizes × 5 concurrencies = 30 cells + 5-cell supplement — **withdrawn 2026-09-18**: no cache flush between cells, parallel-vs-queued indistinguishable, per-stream columns. Kept for audit, **numbers must not be quoted** (superseded twice over — see `prv3-v14-20260919/`) | ⚠️ withdrawn |
 | `cache/` | what a repeated prompt is worth, at 2 k / 32 k / 131 k — prices the nonce defect | ⏳ not yet run |
 | `channel/` | chat vs native `/generate`, same unconstrained prompt, alternated within each wave | ⏳ not yet run |
 | `TABLES.generated.md` | every table of FINAL-METRICS §2–§8, rendered straight from this directory by `../benchmarks/render_report_tables.py`. Re-run that command to check the report byte for byte | regenerated as stages land |
@@ -62,13 +62,9 @@ error bar and is not decoration.
 > The per-stream records are kept for every cell, so any number above can be recomputed
 > from `de/de_<type>_c<N>.json` rather than taken on trust.
 
-**`pr/` headline**: aggregate prefill rate above 8192 input tokens is flat in
-concurrency (524288: 1323–1409 tok/s from C1 to C16; the 16th stream's TTFT is
-5955 s). Three evidence channels agree — `summary.json` (engine probe), per-stream
-`t0` dispatch records, and `pr/engine-evidence.md` (per-step scheduler attribution,
-27/30 strict on the admission law; the 3 exceptions are page-size seam steps).
-The pre-restart 25 cells are in `pr-prefix/` on the run host and **not shipped**.
-`pr/engine-steps.log` holds the raw scheduler lines (5306) behind that evidence table.
+**`pr/` headline**: this directory is the *withdrawn* PR-v2 archive. The current PR
+numbers live in [`prv3-v14-20260919/`](#prv3-v14-20260919--pr-v3-纯-prefill-总吞吐chunk-81924040-格现行-pr-归档);
+the two supersession chains are documented there and in FINAL-METRICS §3.
 
 ### `fp4_256/`, `grammar/`, `gw/`
 
@@ -90,15 +86,19 @@ The pre-restart 25 cells are in `pr-prefix/` on the run host and **not shipped**
 是同步准入（≤2048）与串行准入（≥8192）之间的过渡档。
 
 > ⚠️ **2026-09-18 起本目录的 PR 数值已作废**，作废理由见
-> `../prv3-20260918/` 与 FINAL-METRICS §3。目录保留用于复核，**数值不得引用**。
+> `../prv3-v14-20260919/` 与 FINAL-METRICS §3。目录保留用于复核，**数值不得引用**。
 
 ---
 
-## `prv3-20260918/` — PR-v3 纯 prefill 总吞吐（现行 PR 归档）
+## `prv3-20260918/` — PR-v3 @ chunk 4096（**已被 v14 取代，数值不得引用**）
 
 `RUN_TAG=prv3-20260918T2310`，harness `benchmarks/pr_matrix_v3.py`，7 档输入
 （2048 / 4096 / 8192 / 16384 / 32768 / 65536 / 131072）× 5 档并发（1/2/4/8/16）
-= 35 格，**实测 34 格**。
+= 35 格，实测 34 格，`chunked_prefill_size=4096`，峰值 3337.6 t/s（8192 × C1）。
+
+> ⚠️ **2026-09-19 起，本目录被 [`prv3-v14-20260919/`](#prv3-v14-20260919--pr-v3-纯-prefill-总吞吐chunk-81924040-格现行-pr-归档)
+> 整体取代**（8192-chunk 全量重测 40/40 格）。保留用于复核取代理由与新旧对照
+> （FINAL-METRICS §3.4），**其数值不得再被引用**。以下文件描述保留原样，仅具溯源意义。
 
 | 文件 | 内容 |
 |---|---|
@@ -116,8 +116,30 @@ The pre-restart 25 cells are in `pr-prefix/` on the run host and **not shipped**
 3. **总吞吐** —— `Σ(全部成功流 prompt token) ÷ 墙钟`，墙钟 = 放行第一流 → 最后一流结束；
    `max_new_tokens=1`（纯 prefill，无 decode 尾巴）。
 
-**未测**：`131072 × C16`（本轮跑到第 34 格时按维护窗口决策停跑——是未测量，不是失败）。
+**未测**：`131072 × C16`（本轮跑到第 34 格时按维护窗口决策停跑——是未测量，不是失败；
+该缺口已在 v14 轮补齐）。
 **已知限制**：每格 1 波 ⇒ 无误差棒。
+
+## `prv3-v14-20260919/` — PR-v3 纯 prefill 总吞吐（chunk 8192，40/40 格，**现行 PR 归档**）
+
+`RUN_TAG=prv3-v14-final`（2026-09-19，引擎侧 14:11:51 → 15:36:10 UTC），harness
+`benchmarks/pr_matrix_v3.py`，**8 档输入（512…131072）× 5 档并发 = 40 格全测**，
+`chunked_prefill_size=8192`，零失败、无缺口。上一轮的 131072×C16 缺口与 512 行空缺
+均在本轮补齐。逐格口径与 v3 相同（nonce + flush + `max_new_tokens=1` + Σtoken ÷ 墙钟）。
+
+| 文件 | 内容 |
+|---|---|
+| `summary.json` | 40 格逐格结果 + `_meta`（`run_tag=prv3-v14-final`、`chunked_prefill_size=8192`、协议原文） |
+| `TABLE.md` | harness 渲染的 40 格总表（含 TTFT 首末、墙钟） |
+| `CONCURRENCY.md` | `pr_v3_concurrency.py <raw> 0.010 8192` 的输出：准入律 `min(C, max(1, ⌊8192/input⌋))` **35/40 精确吻合、无一格超出**；真并行步 11 格（512 档步宽最高 13、2048 档最高 4、4096 档宽 2）；>4096 token 的多流格 21/21 串行 |
+| `raw/<input>-c<C>-w0.json` | 40 个逐流原始记录 |
+
+**引用头条数字**：峰值 **3,326.4 t/s**（8192 × C4）；次高 3,288.5（4096 × C2）；
+512 行 C1→C16 **+103.9%**；长输入窄带 1,366.9–1,963.0 t/s。
+**已知限制**：每格 1 波 ⇒ 无误差棒；chunk 4096→8192 只有单轮实测，无 A/B。
+
+复现：`python3 ../benchmarks/render_pr_v3_tables.py prv3-v14-20260919`；
+并发判定：`python3 ../benchmarks/pr_v3_concurrency.py prv3-v14-20260919/raw 0.010 8192`。
 
 ## `gsm8k-20260917/` — the two GSM8K runs
 

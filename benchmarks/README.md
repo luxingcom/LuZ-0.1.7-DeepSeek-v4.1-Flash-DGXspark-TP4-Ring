@@ -22,8 +22,8 @@ If you want to re-derive a number rather than trust it, start here and in
 | `sd_protocol.py` | **the shared protocol module**: `new_nonce()`, `build_prompt()`, `stream_chat` / `stream_generate`, per-stream accounting, `aggregate_wave`, `dump` | — | FINAL-METRICS §1 |
 | `de_matrix_v3.py` | DE matrix, 4 prompt-label types × 5 concurrencies × 3 waves, **no grammar**, force-filled budget | `../data/sd1-20260918/de/` (20 cells + 20 raw records) | FINAL-METRICS §4 |
 | `pr_matrix_v2.py` | ⚠️ **superseded — its archive is withdrawn as a baseline (2026-09-18).** Kept source-only so the withdrawal can be audited: it did not flush the radix cache between cells, could not distinguish parallel prefill from queued prefill, and reported per-stream rates rather than total throughput | `../data/sd1-20260918/pr/` (35 cells) — **numbers must not be quoted** | — |
-| `pr_matrix_v3.py` | **PR-v3, the current PR harness.** Pure-prefill total throughput: `max_new_tokens=1`, fresh nonce per request, `POST /flush_cache` between cells, total = `Σ(prompt tokens) / wall-clock (arm start → last stream end)`. 7 sizes (2048…131072) × 5 concurrencies, 1 wave | `../data/prv3-20260918/` (34 cells + 34 raw per-stream records) | FINAL-METRICS §3 |
-| `pr_v3_concurrency.py` | **re-analysis, not a new measurement.** Clusters the archived per-stream first-token instants to decide whether a cell really prefilled more than one request per step. Needed because `ttft_overlap_peak` is degenerate when `max_new_tokens=1` (`t_end − t_first ≈ 0.1 ms`, so the span sweep can never reach 2) | consumes `../data/prv3-20260918/raw/` | FINAL-METRICS §3.3 |
+| `pr_matrix_v3.py` | **PR-v3, the current PR harness.** Pure-prefill total throughput: `max_new_tokens=1`, fresh nonce per request, `POST /flush_cache` between cells, total = `Σ(prompt tokens) / wall-clock (arm start → last stream end)`. 8 sizes (512…131072) × 5 concurrencies, 1 wave | `../data/prv3-v14-20260919/` (40/40 cells, chunk 8192, **current**) + `../data/prv3-20260918/` (34/35 cells, chunk 4096 — superseded, numbers not to be quoted) | FINAL-METRICS §3 |
+| `pr_v3_concurrency.py` | **re-analysis, not a new measurement.** Clusters the archived per-stream first-token instants to decide whether a cell really prefilled more than one request per step. Needed because `ttft_overlap_peak` is degenerate when `max_new_tokens=1` (`t_end − t_first ≈ 0.1 ms`, so the span sweep can never reach 2). Takes the chunk size as its third argument (default 4096 = the 09-18 archive; pass 8192 for v14) | consumes `../data/prv3-v14-20260919/raw/` and `../data/prv3-20260918/raw/` | FINAL-METRICS §3.3 |
 | `pr_engine_steps.py` | the **third** evidence channel for the prefill admission law: attributes the scheduler's own `Prefill batch` lines to cells by wall-clock window and tests `max #new-seq`, `sum #new-token == C x input` and `max #queue-req` against the prediction | `../data/sd1-20260918/pr/engine-steps.log` (the pr-window lines) + a per-cell table | FINAL-METRICS §3 |
 | `grammar_ab.py` | guided-decoding cost: `sampling_params.json_schema` present vs absent, same prompt body, separate nonces | `../data/sd1-20260918/grammar/`, `.../grammar2/` | FINAL-METRICS §5.1 |
 | `gw_ab_v2.py` | the `:8001` gateway vs direct `:8899`, three arms (prefill / decode / **wall, not streamed**) | `../data/sd1-20260918/gw/` | FINAL-METRICS §6 |
@@ -31,7 +31,7 @@ If you want to re-derive a number rather than trust it, start here and in
 | `channel_ab.py` | chat channel vs native `/generate` on an identical unconstrained prompt, alternated within each wave | `../data/sd1-20260918/channel/` | FINAL-METRICS §5.2 |
 | `preflight_sd1.py` | 5 protocol checks, including the **nonce regression gate** (§8) | — | §8 |
 | `render_report_tables.py` | renders the tables in FINAL-METRICS §4–§8 from the SD-1 archives. Exits non-zero and names the missing stage rather than emitting an empty table | `../data/sd1-20260918/TABLES.generated.md` | FINAL-METRICS §4–§8 |
-| `render_pr_v3_tables.py` | renders the two PR-v3 tables (34-cell per-cell, and the 7×5 compressed view) from `data/prv3-20260918/`. Recomputes the concurrency columns from the raw per-stream files, so it does **not** trust `ttft_overlap_peak` | — | FINAL-METRICS §3 |
+| `render_pr_v3_tables.py` | renders the two PR-v3 tables (per-cell, and the compressed view) from a PR-v3 archive directory. Recomputes the concurrency columns from the raw per-stream files, so it does **not** trust `ttft_overlap_peak` | — | FINAL-METRICS §3 |
 | `run_sd1_all.sh` | the staged main chain (`de → grammar → fp4_256 → gw → pr`), each stage its own `docker exec`, with a 30 s UMA memory sampler. `STAGES=` runs a subset and `TAG=` reuses a run directory, so a harness change invalidates one stage rather than five | the run directory itself | — |
 | `run_sd1_extra.sh` | the closure stages (`cache → channel → grammar2`), run **after** the main chain | appends into the same run directory | — |
 | `common_window.py` | re-analysis: delivered throughput while every stream in a wave overlaps | consumes raw per-cell records | (see §6) |
@@ -174,11 +174,14 @@ put a grammar in front of production traffic:
 The PR matrix measures something the other tables never touch: what this stack does when
 the *prompt* is long. The answer is not "it scales", and the reason is in the scheduler.
 
-The engine runs with `--chunked-prefill-size 4096`, so a step's prefill token budget is
-4096 tokens **in total**. In `PrefillAdder` (`sglang/srt/managers/schedule_policy.py`) a
-request whose prompt exceeds that budget is truncated into a chunk and recorded as the
-scheduler's single `chunked_req`; `add_chunked_req` charges the whole step budget to it
-and, while it is unfinished, the admission loop has nothing left to give anyone else:
+The engine runs with `--chunked-prefill-size 8192` (the 2026-09-19 benchmark form;
+the 2026-09-18 archive was measured at 4096 — the launcher accepts
+`{2048, 4096, 6144, 8192}` and PR numbers are only comparable at equal chunk), so a
+step's prefill token budget is 8192 tokens **in total**. In `PrefillAdder`
+(`sglang/srt/managers/schedule_policy.py`) a request whose prompt exceeds that budget
+is truncated into a chunk and recorded as the scheduler's single `chunked_req`;
+`add_chunked_req` charges the whole step budget to it and, while it is unfinished,
+the admission loop has nothing left to give anyone else:
 
 ```python
 # add_chunked_req, after charging the step budget
@@ -189,12 +192,17 @@ A request at or below the budget is never truncated, is therefore *not* the chun
 and several such requests are admitted into one step. Hence:
 
 ```
-prefills advanced per step  ==  min(concurrency, floor(chunked_prefill_size / input_tokens))
+prefills advanced per step  ==  min(concurrency, max(1, floor(chunked_prefill_size / input_tokens)))
 ```
 
-**Above `chunked_prefill_size`, prefill is strictly one request at a time.** That is what
-the flat `Agg prefill tok/s` column in the PR table is — it is the single-stream chunked
-rate, not a concurrency result — and it is why TTFT there grows with queue position.
+The `max(1, …)` clamp covers the truncated case: above the budget `floor(...)` is 0,
+but the chunked request itself still advances one step at a time.
+
+**Above `chunked_prefill_size`, prefill is strictly one request at a time.** That is
+what the flat long-input rows in the PR table are — the single-stream chunked rate,
+not a concurrency result — and it is why TTFT there grows with queue position. At
+and below half the budget, admission is genuinely parallel (the v14 table shows width
+13 at 512 tokens, width 4 at 2048, width 2 at 4096).
 
 Three independent layers agree, and they are all checkable:
 
@@ -255,11 +263,16 @@ The verdict therefore comes from `pr_v3_concurrency.py`, which clusters the arch
 per-stream **first-token instants** instead — a stream that shared a prefill step emits
 its first token at the same wall instant as its step-mates, and a serialized stream is
 one service-time away. The tolerance is derived from the data rather than picked:
-within-step jitter is ≤ **0.5 ms** and the smallest between-step gap is **64 ms**, so
-10 ms sits inside a two-order-of-magnitude separation. The verdict is stable for any
-tolerance in 0.005–0.05 s and only flips 7 cells at ≥ 0.2 s. On that basis the law holds
-**34/34** on PR-v3 — including the 2048 row, where the observed width is genuinely 2
-(`floor(4096/2048)`) and is the *only* place in the matrix with real parallel prefill.
+within-step jitter is ≤ **0.5 ms** and the smallest between-step gap is **64 ms** (the
+4096-chunk archive; the v14 run's between-step gaps are ≈2.4–2.6 s at the 4096 row and
+≈0.55–2.55 s at the 512 row — the two-order-of-magnitude separation holds), so
+10 ms sits inside that separation. The verdict is stable for any
+tolerance in 0.005–0.05 s. On the current archive the law holds
+**35/40** at chunk 8192 (the five shortfalls are arrival effects in the tiny-prompt
+cells, and **no cell exceeds the law**), with real parallel prefill in 11 cells —
+512-row steps reach width 13, the 2048 row width 4 (`floor(8192/2048)`), the 4096 row
+width 2; it was measured **34/34** on the superseded 4096-chunk archive, where the
+2048 row was the *only* place in the matrix with real parallel prefill.
 
 ---
 
