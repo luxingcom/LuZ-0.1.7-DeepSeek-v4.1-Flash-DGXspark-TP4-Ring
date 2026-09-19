@@ -1,6 +1,6 @@
 # LuZ-0.1.7-DSV41F · DeepSeek-V4.1-Flash（SGLang）· 4× DGX Spark TP4 · 无交换机环网
 
-**仓库版本 v0.2.3**（2026-09-19），见[版本更新报告](docs/release-notes/RELEASE-NOTES-v0.2.3.md)。
+**仓库版本 v0.2.4**（2026-09-20），见[版本更新报告](docs/release-notes/RELEASE-NOTES-v0.2.4.md)。
 镜像自 v0.2.2 起未变：仍是 `dsv41-sglang-optimized:v7`，内容身份 `4ebef21b6aedbd70`。
 
 在 **4× NVIDIA DGX Spark（GB10）无交换机 RoCE 环网**上以 **SGLang TP4 / EP2** 部署
@@ -183,9 +183,17 @@ b12x 是消费级 Blackwell（SM120/SM121）的 CuTe-DSL 内核库：NVFP4/MXFP4
 融合 MoE、paged/dense/sparse MLA 注意力、DSA indexing、mHC 残差、PCIe 集合通信。
 本仓库把它 vendor 到 `b12x-site/`，并把选定的 SGLang 算子路由过去：
 
-- **MoE W4A16→b12x**（`adapter/moe_b12x.py`，门 `DSV41_MOE_B12X=1`）：在
-  replicated-input EP 契约下把 `flashinfer_mxfp4` MoE 路由到 b12x `fused_moe`。
-  烘焙对比（真实 layer-2 权重）：b12x 在每个 M 都领先（M=6 延迟 −11.4 % … M=2048 −5.2 %）。
+- **MoE →b12x**（`adapter/moe_b12x.py`，门 `DSV41_MOE_B12X=1`，默认
+  `DSV41_MOE_B12X_QUANT=a8`）：在 replicated-input EP 契约下把 `flashinfer_mxfp4`
+  MoE 路由到 b12x `fused_moe`。**实测区间**（原始数据
+  [`docs/operators/moe-bakeoff-20260914.json`](docs/operators/moe-bakeoff-20260914.json)）：
+  b12x 在小/decode M 领先（M=6 延迟 −10 % … M=2048 a8 −5.2 %）；**W4A16 在 M≈2048
+  被反超**（较 FlashInfer CUTLASS W4A8 慢 +7.2 %）——早期 docstring 把 a8 数字误标成
+  a16、夸大了适用区间，2026-09-19 已纠正。实测上限之上（M=4096–8192，
+  `--chunked-prefill-size` ≥ 4096 时可达）**尚无 a8 实测**：prefill 密集负载应设
+  `DSV41_MOE_B12X=0`（全 FlashInfer W4A8），第三方长输入评测在该形态测得 +30–89 %
+  随长度放大。MMAX→FlashInfer 混合路由**仅在 `DSV41_MOE_B12X_DUAL_HOLD=1` 时武装**——
+  single-hold 下启用会静默污染大 M KV（见[事故分析](docs/operators/V41-B12X-LARGEM-REGRESSION-ANALYSIS-20260919.md)）。
 - **Dense MXFP8 线性层 → FlashInfer b12x 后端**（`adapter/mxfp8_b12x.py`，
   `DSV41_MXFP8_BACKEND=b12x`）：SGLang 的 CUTLASS SM120 内核在 decode 时把 M=6
   pad 到 128（实测 50–75 GB/s，占 118 ms decode step 中的 52 ms）；b12x 的 warp 级
@@ -241,7 +249,10 @@ b12x 是消费级 Blackwell（SM120/SM121）的 CuTe-DSL 内核库：NVFP4/MXFP4
    `freeze_kernel_resolution` 在活请求中碰到 cache miss 会抛错——但任何新形状
    在服务中撞上冻结集合都是**硬错误**，不是慢回退。
 6. **回退项已登记、不藏**：c6 聚合 −9 %（EP2 副作用）；形态 B 配置下 900K 上下文不可用
-   （Engram 缓存 + K-pad 缓冲吃掉约 2 GB 深上下文余量；600K 及以下不受影响）。
+   （Engram 缓存 + K-pad 缓冲吃掉约 2 GB 深上下文余量；600K 及以下不受影响）；
+   **single-hold 下的 MoE 混合路由会污染大 M KV**（`MMAX` 委派必须搭配
+   `DSV41_MOE_B12X_DUAL_HOLD=1` 才允许武装——已由 needle 门抓获，见
+   [docs/operators/](docs/operators/)）。
 7. **无上游 review。** 这里每个文件都是本地工程产物（r9-ops 通道工作，
    2026-09-15 波次移植上游 PR #38409/#39370/#39420/#39187/#38979 并为本 fork 重写）。
    请把它当工程快照，而不是可分发的补丁集：复用前请按你自己的威胁/性能模型审 `sglang-overlay/`。
@@ -311,7 +322,8 @@ b12x 是消费级 Blackwell（SM120/SM121）的 CuTe-DSL 内核库：NVFP4/MXFP4
 - `BUILD-IDENTITY.md` — 镜像 ID、SGLang commit、组件版本、发布件哈希，
   以及用于核对镜像的**内容身份公式**
 - `docs/` — 部署方案、上游 ISSUE/PR 调研、基准横向对比、终版指标板、
-  以及[版本更新报告](docs/release-notes/)
+  以及[版本更新报告](docs/release-notes/)和
+  [算子全景清单与回退台账](docs/operators/)（§4 的证据底座）
 
 ---
 

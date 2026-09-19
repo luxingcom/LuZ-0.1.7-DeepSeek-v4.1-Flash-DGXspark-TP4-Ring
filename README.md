@@ -1,7 +1,7 @@
 # LuZ-0.1.7-DSV41F · DeepSeek-V4.1-Flash on 4× DGX Spark · TP4 switchless RoCE ring
 
-**Repo version: v0.2.3** (2026-09-19) — see the
-[release notes](docs/release-notes/RELEASE-NOTES-v0.2.3.md). Image identity is
+**Repo version: v0.2.4** (2026-09-20) — see the
+[release notes](docs/release-notes/RELEASE-NOTES-v0.2.4.md). Image identity is
 unchanged since v0.2.2: still `dsv41-sglang-optimized:v7`, content identity
 `4ebef21b6aedbd70`.
 
@@ -211,9 +211,20 @@ GEMM, fused MoE, paged/dense/sparse MLA attention, DSA indexing, mHC residual, P
 collectives. This repo vendors it under `b12x-site/` and routes selected SGLang ops
 onto it:
 
-- **MoE W4A16→b12x** (`adapter/moe_b12x.py`, gate `DSV41_MOE_B12X=1`): routes
-  `flashinfer_mxfp4` MoE to b12x `fused_moe` under the replicated-input EP contract.
-  Bake-off (real layer-2 weights): b12x ahead at every M (M=6 −11.4 % latency … M=2048 −5.2 %).
+- **MoE →b12x** (`adapter/moe_b12x.py`, gate `DSV41_MOE_B12X=1`, default
+  `DSV41_MOE_B12X_QUANT=a8`): routes `flashinfer_mxfp4` MoE to b12x `fused_moe`
+  under the replicated-input EP contract. **Measured regime, from the raw
+  bake-off** ([`docs/operators/moe-bakeoff-20260914.json`](docs/operators/moe-bakeoff-20260914.json)):
+  b12x wins at small/decode M (−10 % latency at M=6 … −5.2 % at M=2048 with a8);
+  **W4A16 loses the crossover at M≈2048** (+7.2 % vs FlashInfer CUTLASS W4A8) —
+  an earlier docstring mislabeled the a8 numbers as a16 and over-claimed the
+  regime; corrected 2026-09-19. Above the measured range (M = 4096–8192,
+  reachable at `--chunked-prefill-size` ≥ 4096) there is **no a8 measurement
+  yet**: prefill-heavy workloads should set `DSV41_MOE_B12X=0` (all-FlashInfer
+  W4A8), which a third-party long-input evaluation measured at +30–89 % with
+  length. The MMAX→FlashInfer hybrid route is **inert unless
+  `DSV41_MOE_B12X_DUAL_HOLD=1`** — arming it under single-hold corrupts
+  large-M KV (see [the regression write-up](docs/operators/V41-B12X-LARGEM-REGRESSION-ANALYSIS-20260919.md)).
 - **Dense MXFP8 linears→FlashInfer b12x backend** (`adapter/mxfp8_b12x.py`,
   `DSV41_MXFP8_BACKEND=b12x`): SGLang's CUTLASS SM120 kernel pads M=6→128 at decode
   (measured 50–75 GB/s, 52 ms of a 118 ms decode step); the b12x warp-level kernel
@@ -280,7 +291,10 @@ Headline operators, all fusing what upstream runs as separate kernels:
    not a slow fallback.
 6. **Documented regressions, not hidden**: c6 aggregate −9 % (EP2 side effect); 900 K
    context unavailable in the Form B configuration (Engram cache + K-pad buffer cost
-   ~2 GB of deep-context headroom — 600 K and below unaffected).
+   ~2 GB of deep-context headroom — 600 K and below unaffected); **MoE hybrid route
+   under single-hold corrupts large-M KV** (the `MMAX` delegation must only be armed
+   with `DSV41_MOE_B12X_DUAL_HOLD=1` — caught by the needle gate, see
+   [docs/operators/](docs/operators/)).
 7. **No upstream review.** Every file here is a local engineering artifact (r9-ops lane
    work, 2026-09-15 wave ports of upstream PRs #38409/#39370/#39420/#39187/#38979
    re-authored for this fork). Treat it as an engineering snapshot, not a
@@ -364,7 +378,8 @@ Full six-stack comparison incl. LuZ / Vision-Exp / GLM:
 - `BUILD-IDENTITY.md` — image IDs, SGLang commit, component versions, artifact hashes,
   and the exact identity formula to check an image against
 - `docs/` — deployment plan, upstream ISSUE/PR survey, benchmark comparison, the
-  final metrics board, and the [release notes](docs/release-notes/)
+  final metrics board, the [release notes](docs/release-notes/), and the
+  [operator inventory & rollback ledger](docs/operators/) (§4's evidence base)
 
 ---
 
