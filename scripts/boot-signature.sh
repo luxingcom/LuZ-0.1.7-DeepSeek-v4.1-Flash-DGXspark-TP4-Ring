@@ -136,6 +136,16 @@ if [ "$DO_BENCH" = "1" ]; then
 fi
 
 echo
-if [ "$fail" = 0 ]; then echo '[+] BOOT SIGNATURE OK'; else
-  echo '[✗] BOOT SIGNATURE FAIL —— 质量门查不出这个；处置见本脚本头部注释'; fi
-exit "$fail"
+  # DSV41 2026-09-19：无抽签断言（慢靴根因=autotune tactic 彩票）
+  _DL=$(docker logs dsv41-head 2>&1 || true)
+  if [ "$fail" = 0 ] && grep -q "tuning from scratch" <<<"$_DL"; then
+    echo "[!] 检测到 autotune 冷启动重签 —— 本靴 tactic 为新抽，慢靴风险；重启一次再判"
+    exit 1
+  fi
+  if [ "$fail" = 0 ] && grep -q "majority-vote adopted" <<<"$_DL"; then
+    echo "[+] autotune tactic 已钉住（多数表决采纳，无重抽）"
+  fi
+  if [ "$fail" = 0 ]; then echo "[+] BOOT SIGNATURE OK"; else
+      echo '[✗] BOOT SIGNATURE FAIL —— 质量门查不出这个；处置见本脚本头部注释'
+  fi
+  exit "$fail"
