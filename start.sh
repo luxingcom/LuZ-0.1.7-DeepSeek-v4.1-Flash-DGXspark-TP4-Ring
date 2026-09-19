@@ -309,6 +309,10 @@ declare -A SGLANG_OVERLAY_MAP=(
   [schedule_policy.py]=python/sglang/srt/managers/schedule_policy.py
   # DSV41 2026-09-19: autotune discard→majority-vote (kill the per-boot tactic lottery = slow-boot root cause)
   [flashinfer_autotune.py]=python/sglang/srt/model_executor/runner/flashinfer_autotune.py
+  # DSV41 2026-09-19: tool-call truncation semantics (vLLM #52645 port)
+  # v41 is identical to base (105 lines, zero parse override) — overlay for completeness
+  [deepseekv32_detector.py]=python/sglang/srt/function_call/deepseekv32_detector.py
+  [deepseekv41_detector.py]=python/sglang/srt/function_call/deepseekv41_detector.py
   # --- Lane D Wave 1 (2026-09-15, r9-ops): PR38409 + PR39370-sub1 + PR39138 ---
   [main_norm_rope.cuh]=python/sglang/kernels/jit/csrc/deepseek_v4/main_norm_rope.cuh
   [dspark_accept.py]=python/sglang/kernels/ops/speculative/dspark/dspark_accept.py
