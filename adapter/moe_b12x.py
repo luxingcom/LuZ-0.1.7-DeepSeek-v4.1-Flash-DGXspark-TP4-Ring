@@ -2,14 +2,30 @@
 
 Gate: DSV41_MOE_B12X=1 (unset/0 keeps SGLang's FlashInfer CUTLASS W4A8 path).
 
-Why (bake-off 2026-09-14, state-tp4/moe-bakeoff.json, real layer-2 weights,
-single local shard E=192 K=5120 N=2304 topk=6): b12x ahead at every M --
-M=6 -11.4%, M=12 -9.9%, M=48 -7.7%, M=256 -8.1%, M=2048 -5.2% (w4a16).
+Activation caliber: DSV41_MOE_B12X_QUANT (default a8 = w4a8_mx).
+
+Why b12x at small/mid M (bake-off 2026-09-14, state-tp4/moe-bakeoff.json, real
+layer-2 weights, single local shard E=192 K=5120 N=2304 topk=6):
+M=6 -10%, M=48 -7.7%, M=256 -8.1% (a8), M=2048 -5.2% (a8). a16 runs behind a8
+everywhere measured and at M=2048 is +7.2% SLOWER than FI CUTLASS W4A8 --
+the original header claimed "ahead at every M (w4a16)" by misreading this
+2048 row (the -5.2% is the a8 figure). W4A8 is also the deployment directive,
+so a8 is the default.
+
+Why FI above DSV41_MOE_B12X_MMAX (default 2048): the bake-off never measured
+M>2048 (=chunked_prefill_size at the time). When chunk moved to 4096-8192,
+prefill rode the extrapolation and a customer long-input benchmark (PR-v3,
+2026-09-19) showed FlashInfer CUTLASS W4A8 ahead by a margin that GROWS with
+input length (+30% at 8K input, +84% at 128K) -- activation bytes (bf16 in
+a16 = 2x W4A8) scale with M while expert weights amortize, plus b12x tiles
+are small-M specialized. m>MMAX is therefore delegated to the preserved
+original FlashInfer entry (W4A8) instead of a b12x bucket. MMAX=0 disables
+b12x entirely (all-FI); MMAX huge restores all-b12x.
+
 Our a2a=none topology is replicated-input EP: every rank sees the same bf16
 activations and GLOBAL topk_ids, computes its local expert block, and the
 caller all-reduces partial outputs -- exactly the contract of b12x fused_moe
-(expert block + partial output, no collectives). W4A16 additionally removes
-the MXFP8 activation quantization of the current W4A8 path.
+(expert block + partial output, no collectives).
 
 Two hooks (see sitecustomize):
   * quantization.mxfp4_flashinfer_cutlass_moe: snapshot the RAW e8m0 block
@@ -44,14 +60,16 @@ def _enabled() -> bool:
 
 
 def _quant_mode():
-    """Activation caliber: a16 (default, incumbent) or a8 (w4a8_mx).
+    """Activation caliber: a8 (w4a8_mx, default) or a16.
 
     b12x planning derives the recipe from the source format + activation mode;
     for MXFP4_E8M0_K32 both w4a16 and w4a8_mx are legal (A8 quantizes the
     activations to MXFP8 in-kernel with dynamic per-block scales, no static
-    calibration). bake-off M=2048: a8 39.2ms vs a16 44.4ms (-11.7%).
+    calibration). bake-off M=2048: a8 39.2ms vs a16 44.4ms (-11.7%); a8 is
+    also ahead of a16 at every other measured M and matches the W4A8
+    deployment directive -- default since 2026-09-19 (was a16).
     """
-    value = os.environ.get("DSV41_MOE_B12X_QUANT", "a16").strip().lower()
+    value = os.environ.get("DSV41_MOE_B12X_QUANT", "a8").strip().lower()
     if value in ("a8", "w4a8", "w4a8_mx"):
         return "a8"
     if value not in ("a16", "w4a16", ""):
@@ -118,6 +136,22 @@ def _parse_ladder() -> tuple:
 
 _LADDER = _parse_ladder()
 _MAX_CAP = _LADDER[-1]
+
+# Hybrid routing: m above this delegates to the preserved FlashInfer CUTLASS
+# W4A8 entry. ARMED ONLY under dual-hold: single-hold (default) neutralizes
+# the SM120 block_scale_interleave at load time, so the live scale tensors
+# stay in CHECKPOINT order -- b12x's format, NOT the interleaved layout the
+# FlashInfer CUTLASS kernel consumes. Delegating on those weights computes
+# with wrongly-laid-out scales and silently corrupts long-prefill KV
+# (needle gate failure, 2026-09-19: needle found but numeric suffix dropped,
+# greedy decode degenerating -- every m>MMAX chunk was poisoned).
+# Default is therefore effectively all-b12x; a prefill-heavy deployment that
+# wants pure FlashInfer W4A8 should set DSV41_MOE_B12X=0 (hook never installs,
+# weights interleave normally). MMAX only makes sense with
+# DSV41_MOE_B12X_DUAL_HOLD=1 (costs ~4.3GiB/rank) after a window sweep.
+_MMAX = int(os.environ.get("DSV41_MOE_B12X_MMAX", "999999") or 999999)
+_ORIG_FI_FUNC = None          # preserved ("none","flashinfer_mxfp4") entry
+_fallback_logged = set()      # avoid per-call log spam: one line per m seen
 
 # Telemetry: DSV41_MOE_B12X_STATS=<n> logs max_m / bucket set every n calls.
 # It exists to prove the ladder bound holds ("no plan key above _MAX_CAP") and
@@ -403,10 +437,14 @@ def install(module):
         logger.warning("DSV41 MoE b12x: fused key %s absent; not installed",
                        _FUSED_KEY)
         return
+    global _ORIG_FI_FUNC
+    _ORIG_FI_FUNC = FusedOpPool._fused_funcs[_FUSED_KEY]
     FusedOpPool._fused_funcs[_FUSED_KEY] = _b12x_fused_func
     _swapped = True
-    logger.info("DSV41 MoE b12x: fused func swapped (%s, ladder=%s)",
-                _QUANT, list(_LADDER))
+    logger.info("DSV41 MoE b12x: fused func swapped (%s, ladder=%s, "
+                "fi-fallback=%s)", _QUANT, list(_LADDER),
+                "mmax=%d" % _MMAX if _DUAL_HOLD else "off (single-hold "
+                "scales are checkpoint-order; FI would misread them)")
 
 
 def _b12x_fused_func(dispatch_output, quant_info, runner_config):
@@ -419,6 +457,28 @@ def _b12x_fused_func(dispatch_output, quant_info, runner_config):
     topk_output = dispatch_output.topk_output
     if TopKOutputChecker.format_is_bypassed(topk_output):
         topk_output = topk_output.to_standard()
+
+    # Hybrid routing (2026-09-19): ONLY under dual-hold. Single-hold leaves
+    # the live scales in checkpoint order (see _MMAX comment) -- delegating to
+    # the FlashInfer entry then corrupts long-prefill KV. Under single-hold
+    # every m rides the b12x ladder (start.sh auto-extends CAPS to chunk).
+    m = int(topk_output.topk_ids.shape[0])
+    if m > _MMAX and _DUAL_HOLD:
+        if _ORIG_FI_FUNC is not None:
+            if m not in _fallback_logged:
+                _fallback_logged.add(m)
+                logger.info(
+                    "DSV41 MoE b12x: m=%d > MMAX=%d -> FlashInfer CUTLASS "
+                    "W4A8 entry (a8 ladder caps at %d)", m, _MMAX, _MAX_CAP,
+                )
+            return _ORIG_FI_FUNC(dispatch_output, quant_info, runner_config)
+        # No preserved entry (install raced?): refuse to bucket beyond the
+        # measured range rather than silently regress.
+        raise RuntimeError(
+            "moe_b12x: m=%d > MMAX=%d and the original FlashInfer entry was "
+            "not preserved at install time; set DSV41_MOE_B12X=0 or "
+            "DSV41_MOE_B12X_MMAX >= %d" % (m, _MMAX, m)
+        )
 
     state = _layer_states.get(quant_info.w13_weight.data_ptr())
     if state is None:
