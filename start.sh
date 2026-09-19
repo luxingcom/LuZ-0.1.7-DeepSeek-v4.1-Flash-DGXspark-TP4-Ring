@@ -130,6 +130,39 @@ MEM_FRACTION_STATIC="${MEM_FRACTION_STATIC:-0.95}"
 HEAD_MEM_FRACTION_STATIC="${HEAD_MEM_FRACTION_STATIC:-$MEM_FRACTION_STATIC}"
 MAX_RUNNING_REQUESTS="${MAX_RUNNING_REQUESTS:-4}"
 CHUNKED_PREFILL_SIZE="${CHUNKED_PREFILL_SIZE:-2048}"
+
+# P3⑤ 2026-09-19：顶层 NCCL_ 键 lint（客户坑 9：白名单外的顶层 NCCL_* 不透传，静默陷阱）
+for _k in $(compgen -A variable NCCL_ 2>/dev/null || true); do
+  case " NCCL_ALGO NCCL_BUFFSIZE NCCL_CROSS_NIC NCCL_CUMEM_HOST_ENABLE NCCL_DEBUG NCCL_DEBUG_SUBSYS NCCL_IB_DISABLE NCCL_IB_GID_INDEX NCCL_IB_HCA NCCL_IB_MERGE_NICS NCCL_IB_RETRY_CNT NCCL_IB_SUBNET_AWARE_ROUTING NCCL_IB_TIMEOUT NCCL_IB_TOS NCCL_IGNORE_CPU_AFFINITY NCCL_MAX_NCHANNELS NCCL_MIN_NCHANNELS NCCL_NET NCCL_NET_PLUGIN NCCL_PROTO NCCL_SET_THREAD_NAME NCCL_SHM_DISABLE NCCL_SOCKET_IFNAME NCCL_TUNER_THRESHOLD " in
+    *" $_k ") ;;
+    *) echo "[warn] 顶层 $_k 不在 start.sh 白名单，不会透传到容器——请写入 EXTRA_DOCKER_ENV（客户坑 9）" ;;
+  esac
+done
+
+# ── chunk 三档切换（2026-09-18）：用户改 .env 的 CHUNKED_PREFILL_SIZE 一行即可切换 ──────────
+# 已验证档位（GPU 密扫零失败 + 可起栈）：4096（生产基线）/ 6144（W5 密扫 539 值）/ 8192（本日 681 值）。
+# 关键约束：adapter 的 _cap_for() 对 m>梯级上限抛 RuntimeError ⇒ chunk 每上一档，MoE 梯级必须
+# 同步加同值 rung（W5 判例）。这里自动完成推导：若 EXTRA_DOCKER_ENV 里的 DSV41_MOE_B12X_CAPS
+# 不含 CHUNKED_PREFILL_SIZE，则把该值追加为最后一档 —— 切换时只改一行，不会漏梯级。
+_chunk_ok=0
+for _v in 2048 4096 6144 8192; do [[ "$CHUNKED_PREFILL_SIZE" = "$_v" ]] && _chunk_ok=1; done
+if [[ "$_chunk_ok" != 1 ]]; then
+  echo "[die] CHUNKED_PREFILL_SIZE=$CHUNKED_PREFILL_SIZE 不在已验证档位 {2048,4096,6144,8192}。先跑 moe 梯级密扫再放行（见 ~/chunk8192-window-20260918/RUNBOOK.md §2）" >&2
+  exit 1
+fi
+if [[ -n "${EXTRA_DOCKER_ENV:-}" ]] && grep -q "DSV41_MOE_B12X_CAPS=" <<<"$EXTRA_DOCKER_ENV"; then
+  _caps_val=$(grep -oE 'DSV41_MOE_B12X_CAPS=[0-9,]+' <<<"$EXTRA_DOCKER_ENV" | head -1 | cut -d= -f2)
+  if [[ "$_caps_val" != *",$CHUNKED_PREFILL_SIZE" && "$_caps_val" != "$CHUNKED_PREFILL_SIZE" && "$_caps_val" != *" $CHUNKED_PREFILL_SIZE"* ]]; then
+    case ",$_caps_val," in
+      *",$CHUNKED_PREFILL_SIZE,"*) : ;;  # 已含该档
+      *)
+        _caps_new=$(echo "$_caps_val,$CHUNKED_PREFILL_SIZE" | tr ',' '\n' | sort -n | uniq | paste -sd,)
+        EXTRA_DOCKER_ENV=$(sed "s/DSV41_MOE_B12X_CAPS=$_caps_val/DSV41_MOE_B12X_CAPS=$_caps_new/" <<<"$EXTRA_DOCKER_ENV")
+        echo "[info] chunk 切换联动：DSV41_MOE_B12X_CAPS 自动补 $_caps_val → $_caps_new（_cap_for 按表序首匹配，故追加后重排防误用大桶）"
+        ;;
+    esac
+  fi
+fi
 MAX_TOTAL_TOKENS="${MAX_TOTAL_TOKENS:-320000}"
 
 # --- S5 governance pin (2026-09-17) ---
@@ -272,6 +305,10 @@ gid_index_remote() {
 SGLANG_OVERLAY_DIR="${SGLANG_OVERLAY_DIR:-$HOME/dsv41-flash-dgxsparks/sglang-overlay}"
 declare -A SGLANG_OVERLAY_MAP=(
   [decode_cuda_graph_runner.py]=python/sglang/srt/model_executor/runner/decode_cuda_graph_runner.py
+  # DSV41 (2026-09-19): scheduler prefill share cap (L1186 idea, #34554); env DSV41_PREFILL_SHARE_TOKENS
+  [schedule_policy.py]=python/sglang/srt/managers/schedule_policy.py
+  # DSV41 2026-09-19: autotune discard→majority-vote (kill the per-boot tactic lottery = slow-boot root cause)
+  [flashinfer_autotune.py]=python/sglang/srt/model_executor/runner/flashinfer_autotune.py
   # --- Lane D Wave 1 (2026-09-15, r9-ops): PR38409 + PR39370-sub1 + PR39138 ---
   [main_norm_rope.cuh]=python/sglang/kernels/jit/csrc/deepseek_v4/main_norm_rope.cuh
   [dspark_accept.py]=python/sglang/kernels/ops/speculative/dspark/dspark_accept.py
