@@ -69,6 +69,7 @@ def chat(prompt):
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": MAX_TOKENS,
         "temperature": TEMPERATURE,
+        "chat_template_kwargs": {"thinking": False},
         "stream": False,
     }
     req = urllib.request.Request(
