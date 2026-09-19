@@ -12,13 +12,13 @@ logs-tp4/
 __pycache__/
 *.pyc
 # backups live OUTSIDE the repo (~/r0-backup-*/), never commit them
-<<<<<<< HEAD
 
 # scratch / tooling state. Added 2026-09-18: this directory is where a leak scan's
 # own output lands, and that output quotes every hit verbatim -- an unignored scratch
 # directory is how such a file reaches a commit. It is also not covered by the R0
 # gate above, since it neither is nor looks like a secret-store path.
 .workbuddy/
-=======
+
+# runtime benchmark artifacts (per-stream records, engine logs). Added 2026-09-19:
+# may contain prompts / model outputs; published figures ship under data/ instead.
 bench-results/
->>>>>>> 9d4e311 (chore: exclude bench-results/ runtime artifacts from git)
