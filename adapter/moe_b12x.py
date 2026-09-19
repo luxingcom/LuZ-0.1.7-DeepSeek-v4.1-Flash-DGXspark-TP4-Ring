@@ -158,6 +158,25 @@ def _geometry_key(e_local, k, n, device) -> tuple:
             torch.device(device).index, _QUANT)
 
 
+# 2026-09-19 single-hold: with b12x enabled it is the SOLE consumer of the
+# routed-expert E8M0 scales, so we neutralize the SM120 in-place interleave
+# (call-window-scoped identity on flashinfer.block_scale_interleave -- global
+# patching is unsafe: fp8.py/mxfp4.py serve other layers through the same
+# symbol) and register the LIVE tensors (zero-copy detach alias) instead of
+# cloning checkpoint order beside the interleaved copy. Saves the ~212 MiB/layer
+# clone pair (~4.5 GB; A/B 2026-09-19: ON boot avail 15.22 vs OFF 20.45 GB).
+# Kill-switch: DSV41_MOE_B12X_DUAL_HOLD=1 restores v8-and-earlier dual-hold.
+_DUAL_HOLD = os.environ.get("DSV41_MOE_B12X_DUAL_HOLD", "0") == "1"
+
+
+def _interleave_symbol():
+    try:
+        import flashinfer
+        return flashinfer, getattr(flashinfer, "block_scale_interleave", None)
+    except Exception:
+        return None, None
+
+
 def install_scale_snapshot(module):
     """Hook for sglang.srt.layers.quantization.mxfp4_flashinfer_cutlass_moe."""
     if not _enabled():
@@ -166,19 +185,47 @@ def install_scale_snapshot(module):
 
     def wrapped(self, layer, *args, **kwargs):
         # Layer stores the E8M0 scales as *_scale_inv; quant_info later passes
-        # the SAME tensors as w13/w2_weight_scale (same data_ptr). The SM120
-        # branch interleaves them in place, so clone the checkpoint order now.
+        # the SAME tensors as w13/w2_weight_scale (same data_ptr).
         raw13 = getattr(layer, "w13_weight_scale_inv", None)
         raw2 = getattr(layer, "w2_weight_scale_inv", None)
-        if isinstance(raw13, torch.Tensor) and isinstance(raw2, torch.Tensor):
-            pair = (raw13.detach().clone(), raw2.detach().clone())
+        have = isinstance(raw13, torch.Tensor) and isinstance(raw2, torch.Tensor)
+        fi_mod, fi_inter = _interleave_symbol()
+        single = have and not _DUAL_HOLD and fi_inter is not None
+        if have:
+            if single:
+                # interleave will be neutralized below: the live tensors stay
+                # in checkpoint order, which IS what b12x consumes -- alias.
+                pair = (raw13.detach(), raw2.detach())
+                if not _raw_scales:  # 诊断：仅首个注册打印物理属性（2026-09-19）
+                    for _nm, _t in (("raw13", raw13), ("raw2", raw2)):
+                        logger.info(
+                            "DIAG %s: shape=%s off=%s stride=%s contig=%s ptr%%256=%s "
+                            "leaf=%s grad=%s storage_nbytes=%s tensor_nbytes=%s",
+                            _nm, tuple(_t.shape), _t.storage_offset(), tuple(_t.stride()),
+                            _t.is_contiguous(), _t.data_ptr() % 256, _t.is_leaf,
+                            _t.requires_grad, _t.untyped_storage().nbytes(), _t.numel() * _t.element_size())
+            else:
+                # dual-hold (v8 behavior, or flashinfer symbol missing): clone
+                # checkpoint order, let the SM120 branch interleave in place.
+                pair = (raw13.detach().clone(), raw2.detach().clone())
             _raw_scales[raw13.data_ptr()] = pair
             _raw_scales[raw2.data_ptr()] = pair
+        if single:
+            # Scope the identity strictly to this call: weight loading is
+            # single-threaded per rank, and only the MoE method's own w13/w2
+            # interleaves can run inside original() here. Other consumers
+            # (fp8.py dense path, mxfp4.py) run outside this window.
+            fi_mod.block_scale_interleave = lambda t: t
+            try:
+                return original(self, layer, *args, **kwargs)
+            finally:
+                fi_mod.block_scale_interleave = fi_inter
         return original(self, layer, *args, **kwargs)
 
     module.Mxfp4FlashinferCutlassMoEMethod.process_weights_after_loading = wrapped
-    logger.info("DSV41 MoE b12x: raw scale snapshots armed (%s); ladder "
-                "exact<=%d caps=%s", _QUANT, _EXACT_MAX, list(_LADDER))
+    logger.info("DSV41 MoE b12x: raw scale snapshots armed (%s, hold=%s); ladder "
+                "exact<=%d caps=%s", _QUANT,
+                "dual" if _DUAL_HOLD else "single", _EXACT_MAX, list(_LADDER))
 
 
 class _GeometryState:
