@@ -1,0 +1,51 @@
+# concurrency-proxy-v2 — systemd unit EXAMPLE
+#
+# Install as /etc/systemd/system/concurrency-proxy-v2.service (or a user unit
+# under ~/.config/systemd/user/ + `loginctl enable-linger`). The values below
+# are an example shape only: real deployments set their own ports, upstreams
+# and secrets. Do not commit real values anywhere.
+
+[Unit]
+Description=Concurrency gateway for the LLM inference engine
+After=network-online.target
+Wants=network-online.target
+# NOTE: if the engine itself runs as a systemd unit, order against THAT unit
+# (same user/domain), not against docker.service -- user units cannot see
+# system units.
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/env python3 /opt/gateway/concurrency_proxy_v2.py
+# Cold-prefill fleets may hold connections for minutes; make sure systemd's
+# own stop timeout is not the first thing to kill healthy long streams.
+TimeoutStopSec=60
+Restart=on-failure
+RestartSec=5
+# A gateway this cheap does not need aggressive restart limits; raise them so
+# a slow engine start does not trip the default burst logic.
+StartLimitIntervalSec=0
+
+# --- Example configuration (edit everything below) --------------------------
+Environment=UPSTREAM=http://127.0.0.1:8002
+Environment=PORT=8001
+Environment=MAX_CONCURRENCY=6
+Environment=QUEUE_TIMEOUT=20
+Environment=FIRST_TOKEN_TIMEOUT=600
+Environment=CHUNK_IDLE_TIMEOUT=180
+Environment=HEARTBEAT_INTERVAL=5
+Environment=WRITE_TIMEOUT=60
+Environment=TOTAL_STREAM_TIMEOUT=7200
+Environment=DEDUP_ENABLE=1
+# Management endpoints are unauthenticated while this stays empty:
+Environment=GW_API_KEY=
+# Enable thinking-chain injection only if your chat template needs it:
+Environment=INJECT_ENABLE_THINKING=0
+
+# Drop-in overrides live in, e.g.:
+#   /etc/systemd/system/concurrency-proxy-v2.service.d/zz-tuning.conf
+#   [Service]
+#   Environment=QUEUE_TIMEOUT=5
+#   Environment=MAX_CONCURRENCY=16
+
+[Install]
+WantedBy=multi-user.target
