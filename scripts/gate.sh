@@ -41,9 +41,15 @@ ask() {  # ask <json-body>
 }
 
 # ── 1. 健康 ────────────────────────────────────────────────────────────────
-if curl -fsS --max-time 10 "${auth[@]}" "$BASE/health" >/dev/null 2>&1 \
-   || curl -fsS --max-time 10 "$BASE/health" >/dev/null 2>&1; then
-  ok "engine /health 200"
+# DSV41 2026-09-19 P2⑥：内核守卫（客户坑 2：7.0.0-1019 打瘫 NCCL 的故障内核）
+KERN=$(uname -r)
+if [[ "$KERN" == 7.0.* ]]; then
+  bad "内核 $KERN = 已知打瘫 NCCL/RoCE 的故障内核（ibv_reg_mr_iova2 ENOMEM）；须回退 6.17.0-1031+"
+fi
+# 2026-09-19 外部报告借鉴：引擎 /health 写死 1s 延迟，探活改 /v1/models（同 200 判定，快 ~1000×）
+if curl -fsS --max-time 10 "${auth[@]}" "$BASE/v1/models" >/dev/null 2>&1 \
+   || curl -fsS --max-time 10 "$BASE/v1/models" >/dev/null 2>&1; then
+  ok "engine /v1/models 200"
 else
   bad "engine /health 非 200 —— 服务不可交付"
 fi
@@ -105,9 +111,14 @@ fi
 # gate.sh 照报"GATE PASSED（4 项）"，看不出深档根本没跑。所以：能自动落位就落位，
 # 落不了位就判**失败**（判据跑不起来本身就是失败，不是"跳过"）。
 SUITE_SRC="$HOME/dsv41-flash-dgxsparks/bench/gates_suite.py"
+# ★2026-09-18 布局自适应：/state 的宿主真身有两个时代——state-tp4/（09-17 前）与
+# state/（S5/SD-1 会话起）。两个目录都落位，以 docker 实际挂载为准。
 if [[ -f "$SUITE_SRC" ]] && ! docker exec dsv41-head test -f /state/gates_suite.py 2>/dev/null; then
-  cp "$SUITE_SRC" "$HOME/dsv41-flash-dgxsparks/state-tp4/gates_suite.py" 2>/dev/null \
-    && echo "[*] 已把 gates_suite.py 落位到 state-tp4/（此前 /state 里没有它 ⇒ 深档会被跳过）"
+  _ST_MNT=$(docker inspect dsv41-head --format '{{range .Mounts}}{{.Source}} {{.Destination}}{{"\n"}}{{end}}' 2>/dev/null | awk '$2=="/state"{print $1}')
+  for _d in "$HOME/dsv41-flash-dgxsparks/state-tp4" "$HOME/dsv41-flash-dgxsparks/state" "${_ST_MNT:-}"; do
+    [[ -n "$_d" && -d "$_d" ]] && cp "$SUITE_SRC" "$_d/gates_suite.py" 2>/dev/null
+  done
+  echo "[*] 已把 gates_suite.py 落位（state-tp4/ + state/；容器实际挂载=${_ST_MNT:-?}）"
 fi
 if docker exec dsv41-head test -f /state/gates_suite.py 2>/dev/null; then
   out=$(docker exec -w /state dsv41-head python3 /state/gates_suite.py --corruption --code --key "$KEY" 2>&1)

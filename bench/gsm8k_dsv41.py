@@ -10,6 +10,7 @@ F 新基线 GSM8K 200 题 (idx0-199, 8-shot CoT) — Tessa / testing-expert
 """
 import argparse
 import json
+import os
 import re
 import sys
 import time
@@ -18,7 +19,7 @@ import urllib.request
 BASE = "http://127.0.0.1:8003"  # 网关 (worker <MGMT_OCTET>), 可通过 --base 覆盖
 MODEL = "deepseek-v4.1-flash"
 API_KEY = "YOUR_API_KEY"
-DATA = "~/data/gsm8k_test.jsonl"  # <DATA_DIR>/gsm8k_test.jsonl (node-local)
+DATA = os.environ.get("GSM8K_DATA", os.path.expanduser("~/data/gsm8k_test.jsonl"))  # 环境变量可覆盖；~ 经 expanduser 展开
 OUT_RAW = "/home/spark/dsv41-4x-spark/bench-results/gsm8k-dsv41.raw.jsonl"
 OUT_SUMMARY = "/home/spark/dsv41-4x-spark/bench-results/gsm8k-dsv41.summary.json"
 MAX_TOKENS = 1024
