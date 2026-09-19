@@ -41,6 +41,12 @@ ask() {  # ask <json-body>
 }
 
 # ── 1. 健康 ────────────────────────────────────────────────────────────────
+# DSV41 2026-09-19 P2⑤：IB 口状态零流量断言（客户坑 1 前置）
+for _ibd in rocep1s0f0 rocep1s0f1 roceP2p1s0f0 roceP2p1s0f1; do
+  _st=$(cat /sys/class/infiniband/$_ibd/ports/1/state 2>/dev/null | awk '{print $2}')
+  [[ "$_st" == "ACTIVE" ]] || bad "IB 口 $_ibd state=$_st（应 ACTIVE）—— 环网物理层故障前置"
+done
+ok "四 IB 口全 ACTIVE"
 # DSV41 2026-09-19 P2⑥：内核守卫（客户坑 2：7.0.0-1019 打瘫 NCCL 的故障内核）
 KERN=$(uname -r)
 if [[ "$KERN" == 7.0.* ]]; then
