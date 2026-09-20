@@ -1,4 +1,10 @@
 # LuZ-0.1.7-DSV41F · DeepSeek-V4.1-Flash on 4× DGX Spark · TP4 switchless RoCE ring
+> ### 📥 Download the serving image (13.5 GiB)
+>
+> **[⬇ LuZ-0.2.4-dsv41-tp4-dgxspark.tar.zst — Baidu Netdisk](https://pan.baidu.com/s/1FUJUQ8ZYK5ZIsYZBK8aqkg?pwd=luzi)** · extract code: `luzi`
+>
+> MD5 `9daeb2ba314a1380988ed6f8afbe4657` · content identity `4ebef21b6aedbd70` · verify & install: **[Image download → §7](#7-image-download-release-artifact)**
+
 
 **Repo version: v0.2.4** (2026-09-20) — see the
 [release notes](docs/release-notes/RELEASE-NOTES-v0.2.4.md). Image identity is
@@ -17,7 +23,7 @@ decode operators, a self-heal monitor, the benchmark gate suite, and the raw
 benchmark archives. **No weights, no images, no NCCL binaries.**
 
 中文说明 → **[README.zh-CN.md](README.zh-CN.md)** · 完整部署与基准文档 → **[docs/](docs/)** ·
-基准口径与全部原始归档 → **[benchmarks/README.md](benchmarks/README.md)** / **[data/](data/)**
+基准口径与全部原始归档 → **[benchmarks/README.md](benchmarks/README.md)** / **[data/](data/)** · 📥 **[Image download → §7](#7-image-download-release-artifact)**
 
 ---
 

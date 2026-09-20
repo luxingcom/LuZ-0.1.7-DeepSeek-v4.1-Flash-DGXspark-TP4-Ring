@@ -1,4 +1,10 @@
 # LuZ-0.1.7-DSV41F · DeepSeek-V4.1-Flash（SGLang）· 4× DGX Spark TP4 · 无交换机环网
+> ### 📥 镜像下载（13.5 GiB）
+>
+> **[⬇ LuZ-0.2.4-dsv41-tp4-dgxspark.tar.zst — 百度网盘](https://pan.baidu.com/s/1FUJUQ8ZYK5ZIsYZBK8aqkg?pwd=luzi)** · 提取码：`luzi`
+>
+> MD5 `9daeb2ba314a1380988ed6f8afbe4657` · 内容身份 `4ebef21b6aedbd70` · 校验与安装：**[镜像下载 → §7](#7-镜像下载发布件)**
+
 
 **仓库版本 v0.2.4**（2026-09-20），见[版本更新报告](docs/release-notes/RELEASE-NOTES-v0.2.4.md)。
 镜像自 v0.2.2 起未变：仍是 `dsv41-sglang-optimized:v7`，内容身份 `4ebef21b6aedbd70`。
@@ -13,7 +19,7 @@ SGLang 猴补丁 / 融合 decode 算子、自愈监控、基准门禁套件，�
 **不含权重、镜像、NCCL 二进制。**
 
 English → **[README.md](README.md)** · 完整文档 → **[docs/](docs/)** ·
-基准口径与全部原始归档 → **[benchmarks/README.md](benchmarks/README.md)** / **[data/](data/)**
+基准口径与全部原始归档 → **[benchmarks/README.md](benchmarks/README.md)** / **[data/](data/)** · 📥 **[镜像下载 → §7](#7-镜像下载发布件)**
 
 ---
 
