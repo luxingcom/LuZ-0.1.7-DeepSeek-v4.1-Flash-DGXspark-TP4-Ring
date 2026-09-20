@@ -96,3 +96,23 @@ internal phrasing neutralized):
 - Compliance notes carried in the ledger (§4-O6): b12x's own "not intended for
   production" self-description and the LuZ NCCL shim's missing license text
   remain open items for any redistribution scenario.
+
+## 6. Distribution artifact updated (2026-09-20, post-release)
+
+The cloud-drive distribution file was re-issued under the v0.2.4 name. Same image
+content as before (content identity `4ebef21b6aedbd70` unchanged; §5 above remains
+true), **new filename and new checksums**:
+
+| | value |
+|---|---|
+| File | `LuZ-0.2.4-dsv41-tp4-dgxspark.tar.zst` |
+| Size | 14,462,447,532 bytes (13.5 GiB) |
+| MD5 | `9daeb2ba314a1380988ed6f8afbe4657` |
+| SHA256 | `f98af3b5a40ad83150b3f0e0fd3b373fad50e34cbfbc4b7b8786324b36818a3d` |
+| Source | Baidu Netdisk link in [README §7](../../README.md#7-image-download-release-artifact) |
+
+The 2026-09-18 audit under [`data/release-artifact-20260918/`](../../data/release-artifact-20260918/)
+was performed against the v0.2.2-era file and remains valid for what it tested
+(123-blob self-consistency and the offline identity reproduction). Checksums above were
+recomputed over the distributed copy; the offline verifier reproduces content identity
+`4ebef21b6aedbd70` on the new file identically.

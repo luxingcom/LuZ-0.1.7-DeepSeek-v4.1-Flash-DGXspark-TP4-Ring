@@ -387,17 +387,18 @@ Full six-stack comparison incl. LuZ / Vision-Exp / GLM:
 
 The serving image (13.5 GiB) is distributed via cloud drive:
 
-- **Baidu Netdisk**: https://pan.baidu.com/s/1QjmmRu8GbFpWTBRkWslvBQ?pwd=luzi (extract code: `luzi`)
-- **File**: `LuZ-0.1.7-DSV41F-image.tar.zst`
-- **Size**: 14,463,467,578 bytes (13.5 GiB)
-- **MD5**: `10307040cd70ab23436bf34eee829d24`
-- **Content identity**: `4ebef21b6aedbd70` — the same value all four production nodes report, and **re-derivable offline from the archive itself**
+- **Baidu Netdisk**: https://pan.baidu.com/s/1FUJUQ8ZYK5ZIsYZBK8aqkg?pwd=luzi (extract code: `luzi`)
+- **File**: `LuZ-0.2.4-dsv41-tp4-dgxspark.tar.zst`
+- **Size**: 14,462,447,532 bytes (13.5 GiB)
+- **MD5**: `9daeb2ba314a1380988ed6f8afbe4657`
+- **SHA256**: `f98af3b5a40ad83150b3f0e0fd3b373fad50e34cbfbc4b7b8786324b36818a3d`
+- **Content identity**: `4ebef21b6aedbd70` — the same value all four production nodes report, and **re-derivable offline from the archive itself** (same image as the v0.2.2-era distribution; the v0.2.4 file is a re-pack under the new name — offline re-run of `verify_release_artifact.py` reproduces this identity on the new file)
 
 Verify before you load anything (no cluster, no docker daemon, no GPU needed):
 
 ```bash
 pip install zstandard
-python scripts/verify_release_artifact.py LuZ-0.1.7-DSV41F-image.tar.zst --md5
+python scripts/verify_release_artifact.py LuZ-0.2.4-dsv41-tp4-dgxspark.tar.zst --md5
 # md5 MATCH · 123/123 blob sha256 verified · 0 unreferenced blobs
 # content identity 4ebef21b6aedbd70 · RESULT: PASS  (exit 0)
 ```
@@ -405,7 +406,7 @@ python scripts/verify_release_artifact.py LuZ-0.1.7-DSV41F-image.tar.zst --md5
 Then load on all four nodes (all of them need the image) and re-check identity locally:
 
 ```bash
-docker load -i LuZ-0.1.7-DSV41F-image.tar.zst   # requires zstd; restores dsv41-sglang-optimized:v7
+docker load -i LuZ-0.2.4-dsv41-tp4-dgxspark.tar.zst   # requires zstd; restores dsv41-sglang-optimized:v7
 docker image inspect -f '{{join .RootFS.Layers " "}}' dsv41-sglang-optimized:v7 \
   | sha256sum | cut -c1-16      # expect: 4ebef21b6aedbd70
 ```

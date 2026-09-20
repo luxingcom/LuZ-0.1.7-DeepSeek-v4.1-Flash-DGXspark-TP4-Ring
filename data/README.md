@@ -188,8 +188,8 @@ both the raw rate and the 107/108 among completed requests must be quoted).
 ## `release-artifact-20260918/` — offline audit of the shipped image
 
 Not a benchmark archive: this is the recorded output of `scripts/verify_release_artifact.py`
-run against the distributed `LuZ-0.1.7-DSV41F-image.tar.zst` (14,463,467,578 B, md5
-`10307040cd70ab23436bf34eee829d24`). It establishes, offline, that the archive is a
+run against the v0.2.2-era distribution `LuZ-0.1.7-DSV41F-image.tar.zst` (14,463,467,578 B,
+md5 `10307040cd70ab23436bf34eee829d24`). It establishes, offline, that the archive is a
 self-consistent content-addressed store (123/123 blobs with `sha256(bytes) == filename`),
 that its reference graph closes (0 unreferenced blobs), and that it reproduces the content
 identity **`4ebef21b6aedbd70`** — the value `start.sh`'s preflight asserts fleet-wide.

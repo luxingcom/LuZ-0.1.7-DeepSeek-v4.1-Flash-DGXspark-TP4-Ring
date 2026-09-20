@@ -331,17 +331,18 @@ b12x 是消费级 Blackwell（SM120/SM121）的 CuTe-DSL 内核库：NVFP4/MXFP4
 
 服务镜像（13.5 GiB）经网盘分发：
 
-- **百度网盘**：https://pan.baidu.com/s/1QjmmRu8GbFpWTBRkWslvBQ?pwd=luzi（提取码 `luzi`）
-- **文件**：`LuZ-0.1.7-DSV41F-image.tar.zst`
-- **大小**：14,463,467,578 字节（13.5 GiB）
-- **MD5**：`10307040cd70ab23436bf34eee829d24`
-- **镜像内容身份**：`4ebef21b6aedbd70` —— 与四台生产机报出的值完全一致，且**可由发布包本身离线复现**
+- **百度网盘**：https://pan.baidu.com/s/1FUJUQ8ZYK5ZIsYZBK8aqkg?pwd=luzi（提取码 `luzi`）
+- **文件**：`LuZ-0.2.4-dsv41-tp4-dgxspark.tar.zst`
+- **大小**：14,462,447,532 字节（13.5 GiB）
+- **MD5**：`9daeb2ba314a1380988ed6f8afbe4657`
+- **SHA256**：`f98af3b5a40ad83150b3f0e0fd3b373fad50e34cbfbc4b7b8786324b36818a3d`
+- **镜像内容身份**：`4ebef21b6aedbd70` —— 与四台生产机报出的值完全一致，且**可由发布包本身离线复现**（与 v0.2.2 时代分发的镜像内容相同；v0.2.4 文件为更名重打包——在新文件上离线重跑 `verify_release_artifact.py` 同样复现此身份）
 
 载入之前先**离线自证**（无需集群、无需 docker 守护进程、无需 GPU）：
 
 ```bash
 pip install zstandard
-python scripts/verify_release_artifact.py LuZ-0.1.7-DSV41F-image.tar.zst --md5
+python scripts/verify_release_artifact.py LuZ-0.2.4-dsv41-tp4-dgxspark.tar.zst --md5
 # md5 吻合 · 123/123 个 blob 的 sha256 全部自洽 · 0 个未引用 blob
 # 内容身份 4ebef21b6aedbd70 · RESULT: PASS  （退出码 0）
 ```
@@ -349,7 +350,7 @@ python scripts/verify_release_artifact.py LuZ-0.1.7-DSV41F-image.tar.zst --md5
 然后在四机分别载入，并按内容身份自检：
 
 ```bash
-docker load -i LuZ-0.1.7-DSV41F-image.tar.zst   # 需要 zstd；解压为 dsv41-sglang-optimized:v7
+docker load -i LuZ-0.2.4-dsv41-tp4-dgxspark.tar.zst   # 需要 zstd；解压为 dsv41-sglang-optimized:v7
 docker image inspect -f '{{join .RootFS.Layers " "}}' dsv41-sglang-optimized:v7 \
   | sha256sum | cut -c1-16      # 期望：4ebef21b6aedbd70
 ```

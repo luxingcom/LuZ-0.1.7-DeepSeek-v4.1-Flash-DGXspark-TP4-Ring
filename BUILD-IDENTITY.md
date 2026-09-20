@@ -249,9 +249,10 @@ Notable environment gates (full list in `.env.tp4.example`):
 
 | | value |
 |---|---|
-| File | `LuZ-0.1.7-DSV41F-image.tar.zst` |
-| Size | 14,463,467,578 bytes (13.5 GiB) |
-| MD5 | `10307040cd70ab23436bf34eee829d24` — recomputed over the local artifact copy; byte count and hash both match |
+| File | `LuZ-0.2.4-dsv41-tp4-dgxspark.tar.zst` |
+| Size | 14,462,447,532 bytes (13.5 GiB) |
+| MD5 | `9daeb2ba314a1380988ed6f8afbe4657` — recomputed over the local artifact copy; byte count and hash both match |
+| SHA256 | `f98af3b5a40ad83150b3f0e0fd3b373fad50e34cbfbc4b7b8786324b36818a3d` — recomputed over the local artifact copy |
 | Produced by | `docker save dsv41-sglang-optimized:v7 \| zstd -T0` on node 01. Because that node uses the containerd image store, the result is an **OCI layout** (`oci-layout`, `index.json`, `manifest.json`, `blobs/sha256/*`), not the plain `<layer>/layer.tar` form |
 | Tar anatomy | 128 members = **123 blobs** + `index.json` + `manifest.json` + `oci-layout` + 2 directory entries. Payload 14,686,175,317 bytes (uncompressed) |
 | Internal integrity | **all 123 blobs verified**: `sha256(bytes) == its own filename` ⇒ the archive is a self-consistent content-addressed store, nothing truncated |
@@ -264,7 +265,7 @@ The identity is therefore re-derivable from the artifact alone:
 
 ```bash
 pip install zstandard
-python scripts/verify_release_artifact.py LuZ-0.1.7-DSV41F-image.tar.zst --md5
+python scripts/verify_release_artifact.py LuZ-0.2.4-dsv41-tp4-dgxspark.tar.zst --md5
 # md5 MATCH · 123/123 blobs verified · 0 unreferenced
 # content identity 4ebef21b6aedbd70  (full: 4ebef21b6aedbd70d5a2563ab512c31a85fc3b3e221c3b2beac6a9d06e2c12c1)
 # RESULT: PASS   (exit 0)
@@ -283,7 +284,7 @@ the *reported* image ID varies — see the two-object DAG at the top of this fil
 Load on all four nodes (workers need the image too):
 
 ```bash
-docker load -i LuZ-0.1.7-DSV41F-image.tar.zst   # requires zstd; restores dsv41-sglang-optimized:v7
+docker load -i LuZ-0.2.4-dsv41-tp4-dgxspark.tar.zst   # requires zstd; restores dsv41-sglang-optimized:v7
 ```
 
 ---
@@ -294,7 +295,7 @@ docker load -i LuZ-0.1.7-DSV41F-image.tar.zst   # requires zstd; restores dsv41-
 # 0. OFFLINE — verify the downloaded archive before loading it anywhere.
 #    No cluster, no docker daemon, no GPU required.
 pip install zstandard
-python scripts/verify_release_artifact.py LuZ-0.1.7-DSV41F-image.tar.zst --md5
+python scripts/verify_release_artifact.py LuZ-0.2.4-dsv41-tp4-dgxspark.tar.zst --md5
 # expect: md5 MATCH · 123/123 blob sha256 verified · 0 unreferenced blobs
 #         content identity 4ebef21b6aedbd70 · RESULT: PASS  (exit 0)
 
