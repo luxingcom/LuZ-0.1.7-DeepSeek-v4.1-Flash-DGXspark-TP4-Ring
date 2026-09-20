@@ -30,7 +30,7 @@ directory on the head node carries each stage's start, exit code and elapsed tim
 | `grammar/` | guided-decoding A/B, 5 concurrencies × 2 arms × 3 waves, **with the per-stream records** | ✅ complete |
 | `fp4_256/` | fp4-indexer short-output arm, 256-token budget, `code` type, C=1/8/16 | ✅ complete (**one arm**: the indexer is on) |
 | `gw/` | `:8001` gateway vs direct `:8899`, three arms (prefill / decode / wall), `ROUNDS=2` | ✅ complete |
-| `pr/` | prompt-rate matrix (PR-v2), 6 input sizes × 5 concurrencies = 30 cells + 5-cell supplement — **withdrawn 2026-09-18**: no cache flush between cells, parallel-vs-queued indistinguishable, per-stream columns. Kept for audit, **numbers must not be quoted** (superseded twice over — see `prv3-v14-20260919/`) | ⚠️ withdrawn |
+| `pr/` | prompt-rate matrix (PR-v2), 6 input sizes × 5 concurrencies = 30 cells + 5-cell supplement — **withdrawn 2026-09-18**: no cache flush between cells, parallel-vs-queued indistinguishable, per-stream columns. Kept for audit, **numbers must not be quoted** (superseded twice over — current archive: `prv3-v18-20260919/`, same-window baseline `prv3-v14-20260919/`) | ⚠️ withdrawn |
 | `cache/` | what a repeated prompt is worth, at 2 k / 32 k / 131 k — prices the nonce defect | ⏳ not yet run |
 | `channel/` | chat vs native `/generate`, same unconstrained prompt, alternated within each wave | ⏳ not yet run |
 | `TABLES.generated.md` | every table of FINAL-METRICS §2–§8, rendered straight from this directory by `../benchmarks/render_report_tables.py`. Re-run that command to check the report byte for byte | regenerated as stages land |
@@ -63,7 +63,7 @@ error bar and is not decoration.
 > from `de/de_<type>_c<N>.json` rather than taken on trust.
 
 **`pr/` headline**: this directory is the *withdrawn* PR-v2 archive. The current PR
-numbers live in [`prv3-v14-20260919/`](#prv3-v14-20260919--pr-v3-纯-prefill-总吞吐chunk-81924040-格现行-pr-归档);
+numbers live in [`prv3-v18-20260919/`](#prv3-v18-20260919--pr-v3-纯-prefill-总吞吐v18024-基线4040-格现行权威基线)（v14 为同窗对照基线）;
 the two supersession chains are documented there and in FINAL-METRICS §3.
 
 ### `fp4_256/`, `grammar/`, `gw/`
@@ -138,8 +138,45 @@ the two supersession chains are documented there and in FINAL-METRICS §3.
 512 行 C1→C16 **+103.9%**；长输入窄带 1,366.9–1,963.0 t/s。
 **已知限制**：每格 1 波 ⇒ 无误差棒；chunk 4096→8192 只有单轮实测，无 A/B。
 
+> ⚠️ **2026-09-20 起，本目录作为基线被 [`prv3-v18-20260919/`](#prv3-v18-20260919--pr-v3-纯-prefill-总吞吐v18024-基线4040-格现行权威基线)
+> 接替**（MoE W4A16→W4A8-MX 生产切换后的 e2e 重测，同为 8192-chunk 同口径）。
+> v14 仍是 v18 的**同窗对照基线**（引擎同日、同工具带外的唯一参考），数值仍可引用，
+> 但做纵向对比时须写明对照对象是 v14。
+
 复现：`python3 ../benchmarks/render_pr_v3_tables.py prv3-v14-20260919`；
 并发判定：`python3 ../benchmarks/pr_v3_concurrency.py prv3-v14-20260919/raw 0.010 8192`。
+
+## `prv3-v18-20260919/` — PR-v3 纯 prefill 总吞吐（v18/0.2.4 基线，40/40 格，**现行权威基线**）
+
+`RUN_TAG=prv3-v18-20260919T234318`（2026-09-19 深夜），采集器
+`bench/prv3_collector.py`（**重建版**——原 v3 采集器会话内联失传，按 v14 数据模式
+同口径重建；**跨工具绝对值对照须谨慎，本表核心是同工具 v14→v18 序列内对照**）。
+**8 档输入（512…131072）× 5 档并发 = 40 格全过**（COMPLETE），`max_tokens=1`、
+逐请求 nonce、格间 flush，与 v14 三条硬约束一致。
+
+引擎形态（head 容器 launch args 实证）：`--chunked-prefill-size 8192
+--enable-mixed-chunk --prefill-decode-interval 4`，MoE **W4A8-MX 全区间**
+（2026-09-19 生产切换，见 docs/operators/ 大 M 事故分析与 v0.2.4 release notes）。
+
+| 文件 | 内容 |
+|---|---|
+| `summary.json` | 40 格逐格结果（由 raw 重建，schema 对齐 v14） |
+| `TABLE.md` | 采集器渲染的 40 格总表（与服务器侧逐字节一致） |
+| `CONCURRENCY.md` | `pr_v3_concurrency.py <raw> 0.010 8192` 输出：准入律 **27/40** 精确吻合、**无一格超出**；13 个偏差格全落在到达主导的小提示词档（10 格低于律、3 格步宽 2 系 mixed-chunk decode 搭载步）；真并行步 11 格 |
+| `raw/<input>-c<C>-w0.json` | 40 个逐流原始记录 |
+
+**v18 对 v14 同格增益**（复算，%）：4096 行 **+30~+38**；8192 行 −9~+25；
+16384 行 +46~+70（C1 −23 单波离群）；32768 行 +34~+68；65536 行 **+67~+132**
+（C8 峰 3,474.6）；131072 行 +35~+68（C1 +3.7）。512 行 **−3~−34**（待复核）。
+
+**待复核（下一靴，≥2 靴纪律）**：512×C8/C16（−19%/−34%，单波方差嫌疑）；
+16384×C1（−23%，同档 C2–C16 全 +46~70）；2048×C8（−7.7%，噪声带内）。
+
+**基线登记**：v18 本次矩阵为**现行权威基线**，此后优化臂对同矩阵复测（≥2 靴、<5% 判噪声）。
+代表值：512×C1 1214.2 / 4096×C16 4043.4 / 8192×C8 3704.1 / 65536×C8 3474.6 /
+131072×C16 2508.1 t/s。全表峰值 **4,299.6 t/s**（4096 × C2）。
+
+并发判定：`python3 ../benchmarks/pr_v3_concurrency.py prv3-v18-20260919/raw 0.010 8192`。
 
 ## `gsm8k-20260917/` — the two GSM8K runs
 
