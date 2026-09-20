@@ -6,10 +6,12 @@
 > MD5 `9daeb2ba314a1380988ed6f8afbe4657` · content identity `4ebef21b6aedbd70` · verify & install: **[Image download → §7](#7-image-download-release-artifact)**
 
 
-**Repo version: v0.2.4** (2026-09-20) — see the
-[release notes](docs/release-notes/RELEASE-NOTES-v0.2.4.md). Image identity is
-unchanged since v0.2.2: still `dsv41-sglang-optimized:v7`, content identity
-`4ebef21b6aedbd70`.
+**Repo version: v0.2.5** (2026-09-20) — see the
+[release notes](docs/release-notes/RELEASE-NOTES-v0.2.5.md). Image is now `dsv41-sglang-optimized:0.2.5` (= `v19-40217prep`, image ID `ab5a109f…`,
+content identity `b4ca63d71bbe8557`): the **#40217 minimal native port**
+(dense-indexer candidate mask bound to `[tail≤128, lc]`) + engram stats v2.
+The 0.2.4 download below is the last *packaged* artifact; the 0.2.5 image is
+distributed as source + `start.sh` rebuild (identity re-derived at build time).
 
 Production recipe for serving **deepseek-ai/DeepSeek-V4.1-Flash** — a ~550 B-parameter
 MoE (40 layers, 384 routed experts/layer, top-6 routing + 1 shared expert, MXFP4
@@ -32,14 +34,16 @@ benchmark archives. **No weights, no images, no NCCL binaries.**
 Every number below is tagged with the **build form it was measured on**. Two forms
 appear in this repo and they are *not* interchangeable — read the tag before quoting.
 
-| | **Form A — current production** | **Form B — tuned reference (2026-09-13)** |
-|---|---|---|
-| context / KV pool | **600,000** / 9,600,000 tokens | 1,048,576 / 4,999,936 tokens |
-| max concurrency | **16** | 12 |
-| fp4 indexer | **enabled** | disabled (evaluated, then off) |
-| `EP_SIZE` | 2 | 2 |
-| board | §2 below | §5 below |
-| full doc | [docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md) | [docs/4DGX-dsv41-基准测试-横向对比-20260912.md](docs/4DGX-dsv41-基准测试-横向对比-20260912.md) |
+Current production (what every number tagged *v19* below was measured on):
+
+| | value |
+|---|---|
+| image | `dsv41-sglang-optimized:0.2.5` — content identity **`b4ca63d71bbe8557`** ([BUILD-IDENTITY.md](BUILD-IDENTITY.md)) |
+| change vs 0.2.4 | **#40217 minimal native port** (dense-indexer candidate mask was an unbounded `[chunk≤8192, lc]` bool ≈2 GiB at 245K prefix — now `[tail≤128, lc]`) + engram stats v2 (observability) |
+| context / KV pool / concurrency | 600,000 / 9,600,000 tokens / 16 |
+| chunk / EP / indexer | 8192 / EP2 / fp4 indexer on |
+| window gates before promotion | suite 18/18 · 4×245.7K needle 4/4 · governance pin → 0.2.5 |
+| full doc | [docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md) |
 
 Exact image IDs, SGLang commit, component versions and the release-artifact hashes:
 **[BUILD-IDENTITY.md](BUILD-IDENTITY.md)**.
@@ -59,15 +63,19 @@ smaller than that error bar is not a result.**
 
 ## 2. Form A — 600K production board
 
-Measured on the running production build. Full tables, per-cell aggregates and the
-raw archives: [docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)
-and [`data/sd1-20260918/`](data/sd1-20260918/).
+Measured on the running production build (**v19 / 0.2.5** for the PR matrix; DE and the side arms are still v18-stack numbers — marked below). Full tables,
+per-cell aggregates and the raw archives:
+[docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md),
+[`data/prv3-v19-40217prep-20260920/`](data/prv3-v19-40217prep-20260920/) and [`data/sd1-20260918/`](data/sd1-20260918/).
 
-### DE decode, per stream (4 prompt-label types, no grammar, force-filled budget)
+### DE decode, per stream (4 prompt-label types, no grammar, force-filled budget) — measured on the v18 (0.2.4) stack
 
 4 types × 5 concurrencies × 3 waves; cell value = `statistics.median` over every ok
 stream of every wave. Full 20-cell table with aggregates, total-throughput view and
 TTFT in [FINAL-METRICS §4](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md).
+**v19 (0.2.5) did not re-run DE** — #40217 touches the prefill path and engram v2 is
+observability-only, but that is untested here: quote these numbers as *v18-stack* until
+the DE re-run lands.
 
 | Type | C=1 | C=2 | C=4 | C=8 | C=16 | wave spread |
 |---|---:|---:|---:|---:|---:|---:|
@@ -82,19 +90,12 @@ TTFT in [FINAL-METRICS §4](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.
 > the cause is *not identified*.
 > **DE aggregate total throughput (Σ output tokens ÷ Σ wave wall): peak 543.9 t/s at
 > code × C16** — 543.9 / 481.0 / 262.8 / 236.4 (code / json / structured / prose);
-> vs the v14 same-formula recompute 528.5, that is **+2.9%**.
+> vs the v14 same-formula recompute 528.5, that is **+2.9%** (v18-stack lineage).
 
 ### PR — pure-prefill total throughput (PR-v3, all 40 cells) — [FINAL-METRICS §3](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)
 
-> ⚠️ **The PR table was re-measured three times.** PR-v2 was withdrawn on 2026-09-18
-> (no cache flush, parallel-vs-queued indistinguishable, per-stream columns); PR-v3
-> pass 1 (34/35 cells, `--chunked-prefill-size 4096`) was superseded on 2026-09-19 by
-> the v14 full re-run at chunk 8192; v14 was in turn **succeeded on 2026-09-19/20 by
-> the v18 (0.2.4, MoE W4A8-MX) re-run** — same protocol, same chunk, 40/40 cells.
-> Superseded archives: [`data/sd1-20260918/pr/`](data/sd1-20260918/pr/),
-> [`data/prv3-20260918/`](data/prv3-20260918/) and
-> [`data/prv3-v14-20260919/`](data/prv3-v14-20260919/) (same-window comparison
-> baseline). **Quote the v18 table below and nothing else.**
+> Baseline lineage: PR-v2 withdrawn (2026-09-18, no cache flush / not total-throughput) → PR-v3 @ chunk 4096 superseded → **v14** (chunk 8192 re-run) → **v18** (0.2.4, MoE W4A8-MX) → **v19** (0.2.5, #40217 native port, **current**). Superseded archives are kept for audit: [`data/sd1-20260918/pr/`](data/sd1-20260918/pr/), [`data/prv3-20260918/`](data/prv3-20260918/), [`data/prv3-v14-20260919/`](data/prv3-v14-20260919/), [`data/prv3-v18-20260919/`](data/prv3-v18-20260919/).
+**Quote the v19 table below and nothing else.**
 
 PR-v3 measures what a load generator actually cares about: **total prompt tokens
 divided by the wall clock from releasing the first stream to the last stream
@@ -103,39 +104,17 @@ every request and a `POST /flush_cache` between cells.
 
 | Input tokens | C1 | C2 | C4 | C8 | C16 |
 |---:|---:|---:|---:|---:|---:|
-| 512 | 1214.2 | 1236.3 | 1795.8 | **1879.3** | 1629.7 |
-| 2,048 | 3076.7 | **3168.1** | 3059.7 | 2261.9 | 2932.7 |
-| 4,096 | 4047.6 | **4299.6** | 3507.6 | 3947.7 | 4043.4 |
-| 8,192 | 3315.7 | 3532.8 | 3041.9 | **3704.1** | 3585.1 |
-| 16,384 | 2341.4 | 3669.6 | **3718.2** | 3694.0 | 2853.5 |
-| 32,768 | 2621.7 | **2835.0** | 2595.6 | 2698.3 | 2673.1 |
-| 65,536 | 3052.9 | 2648.1 | 2565.3 | **3474.6** | 2569.7 |
-| 131,072 | 1835.9 | 2420.9 | 2334.0 | 2297.6 | **2508.1** |
-| 524,288 (single stream) | 2257.2 | — | — | — | — |
+| 512 | 1,279.9 | 1,288.1 | 1,138.8 | 1,891.9 | **2,523.3** |
+| 2,048 | 3,199.9 | 3,095.8 | 3,792.7 | 3,838.1 | **3,876.5** |
+| 4,096 | 4,098.9 | 4,156.3 | 4,285.4 | **4,555.6** | 3,692.5 |
+| 8,192 | 4,794.2 | **4,803.2** | 4,715.7 | 3,370.6 | 4,185.8 |
+| 16,384 | 2,837.0 | 3,101.0 | **4,223.8** | 3,265.8 | 4,210.5 |
+| 32,768 | 3,338.0 | 3,433.8 | **3,645.8** | 2,900.8 | 2,888.0 |
+| 65,536 | 2,899.5 | **2,924.1** | 2,856.8 | 2,719.3 | 2,685.2 |
+| 131,072 | **2,634.9** | 2,559.8 | 2,523.8 | 2,467.5 | 2,517.2 |
+| 524,288 (single stream) | 2,257.2 | — | — | — | — |
 
-**Is it really concurrent, or just queued?** Answered per cell from the archived
-per-stream first-token instants, not from a sampled counter
-([`benchmarks/pr_v3_concurrency.py`](benchmarks/pr_v3_concurrency.py)). Under
-`chunk=8192` the admission law `min(C, max(1, floor(8192/input)))` holds exactly in
-**27/40 cells** — and **no cell ever exceeds it**; all 13 deviations sit in the
-arrival-dominated small-prompt band: 10 cells fall *below* the law (whole batches
-arrived merged into one scheduler step), and 3 cells show a step width of 2 where the
-law predicts 1 (`--enable-mixed-chunk` lets a decode ride along on the prefill step —
-wall-clock matches serialized service time, so this is **not** prefill parallelism).
-Real parallel prefill steps appear in **11 cells** (512-row: width up to 13 · 2048:
-up to 4 · 4096: width 2). Above 4,096 tokens, multi-stream cells run **one request at
-a time** — a prompt longer than the step budget occupies the scheduler alone. So the
-upper rows are genuinely parallel, and the long-input rows are the wall-clock
-throughput of **serialized admission** — an engine policy, not a client defect.
-
-Consequences: the **whole-board peak moves to 4,299.6 t/s (4096 × C2**, **+29.3 %**
-over the v14 peak 3,326.4 at 8192 × C4). Long inputs gain the most: the 65,536 row
-climbs **+67 %…+132 %** (C8 3,474.6) and 131,072×C16 **+60.8 %** (2,508.1); the 4096
-row is up **+30 %…+38 %** at every concurrency. The 512 row is the one regression,
-**−3 %…−34 %** (C16 1,629.7), and its C8 > C16 inversion is a single-wave outlier
-already queued for re-measurement. Above 32 K, inputs converge into a narrow band —
-2,298–2,835 tok/s. One wave per cell means **no error bar**, so gaps inside that band
-are unresolved rather than ranked.
+**Reading the board** (single wave per cell ⇒ no error bar; same-window deltas only): peak **4,803.2 t/s at 8192 × C2** (+11.7% over the v18 peak 4,299.6; median cell **+8.1%**, 31 up / 9 down). The whole 8192 row jumps **+36…+55%** at C1–C4 — the direction #40217's bounded mask predicts (the dense-indexer transient bites hardest when the 8192-token step budget is full). Long inputs (32K–131K) tighten into **2,467.5–3,645.8 t/s**. Honest regressions (single-wave, queued for ≥2-boot re-measurement): 512×C4 −36.6%, 65536×C8 −21.7%, 16384×C2 −15.5%, plus four smaller dips. Concurrency verdict is unchanged in shape from v18: admission law exact in 27/40 cells, real parallel steps in 11/40 (512 up to width 10, 2048 up to 5, 4096 width 2-3; ≥8192 multi-stream cells serialize — engine admission policy, not a client defect; details in [data/prv3-v19-40217prep-20260920/CONCURRENCY.md](data/prv3-v19-40217prep-20260920/CONCURRENCY.md)).
 
 > The 524,288 row is single-stream by design: longer multi-stream cells are not
 > promised — the old C16 attempt hit 5,955 s TTFT.
@@ -149,19 +128,19 @@ are unresolved rather than ranked.
 
 ### Headline figures
 
-**Total throughput — the two numbers to quote: DE aggregate decode peak 543.9 t/s
-(code, C16, v18/0.2.4) · PR pure-prefill total throughput peak 4,299.6 t/s
-(4096 × C2, chunk 8192, v18/0.2.4 baseline).**
+**Total throughput — the two numbers to quote: PR pure-prefill total throughput peak
+4,803.2 t/s (8192 × C2, chunk 8192, **v19/0.2.5**) · DE aggregate decode peak 543.9 t/s
+(code, C16, v18/0.2.4 stack — v19 DE re-run pending).**
 
 | metric | value |
 |---|---|
-| **DE aggregate decode peak (total throughput)** | **543.9 t/s** (code, C16, v18) · v14 same-formula recompute 528.5 (+2.9%) — per-stream C1 peak 88.37 t/s (code) |
-| **PR total throughput peak (pure prefill, PR-v3 @ chunk 8192, v18)** | **4,299.6 t/s** (4096 × C2) · runner-up **4,047.6 t/s** (4096 × C1) · best small-prompt cell **1,879.3 t/s** (512 × C8) |
-| PR concurrency verdict (v18) | real parallel steps in 11/40 cells (512 up to width 13 · 2048 up to 4 · 4096 width 2); multi-stream cells above 4096 tokens serialize; admission law 27/40 exact, none above |
-| PR vs v14 (same window, same chunk) | peak **+29.3 %** · 4096 row +30…+38 % · 65536 row +67…+132 % · 131072×C16 +60.8 % · 512 row −3…−34 % (re-measurement queued) |
-| single-stream decode peak (v18) | **88.37 t/s** (code, C1) — was 83.59 in v14 (+5.7%) |
-| GSM8K, 200 questions | **0.9600** (192/200) · temp 0.6, 8-shot · indexer off |
-| engine cold start | **345.7 s ≈ 5.8 min** (`tokenizer_e2e`) |
+| **PR total throughput peak (pure prefill, PR-v3 @ chunk 8192, v19)** | **4,803.2 t/s** (8192 × C2) · runner-up **4,794.2 t/s** (8192 × C1) · best small-prompt cell **2,523.3 t/s** (512 × C16) · 8192 row C1–C4 **+36…+55%** vs v18 |
+| PR vs v18 (same harness, same chunk, same window) | peak **+11.7 %** · median cell **+8.1 %** (31 up / 9 down) · long tier (≥16K) median +8.1 % · single-wave regressions up to −36.6% queued for re-measurement |
+| PR concurrency verdict (v19) | same shape as v18: admission law exact in 27/40 cells, none above; real parallel steps in 11/40 (512 width ≤10 · 2048 ≤5 · 4096 2–3); ≥8192 multi-stream cells serialize (engine admission policy) |
+| **DE aggregate decode peak (total throughput, v18 stack)** | **543.9 t/s** (code, C16) · per-stream C1 peak 88.37 t/s (code) — v19 re-run pending |
+| GSM8K, 200 questions (v18 stack) | **0.9600** (192/200) · temp 0.6, 8-shot · indexer off |
+| engine cold start | **345.7 s ≈ 5.8 min** (`tokenizer_e2e`, v18) |
+| window gates (v19 promotion) | suite 18/18 · 4×245.7K needle 4/4 · governance pin → 0.2.5 |
 
 Guided decoding, the chat-vs-native channel comparison and what a repeated prompt is
 worth are measured as their own arms in
@@ -318,40 +297,20 @@ Headline operators, all fusing what upstream runs as separate kernels:
 
 ---
 
-## 5. Form B — tuned reference board (2026-09-13)
+## 5. Historical boards (superseded)
 
-The frozen configuration that produced the c1–c12 sweep and the context / long-prompt
-results: **1 M ctx · 5 M KV pool · 12 concurrent · EP_SIZE=2 · PR#17 K-pad ·
-Engram cache 1 GiB/16-way · `--min-free-slots-delay 1` · no fp4 indexer.**
-Full six-stack comparison incl. LuZ / Vision-Exp / GLM:
-[docs/4DGX-dsv41-基准测试-横向对比-20260912.md](docs/4DGX-dsv41-基准测试-横向对比-20260912.md).
+Early-configuration comparisons and their numbers are retired from this page — they
+answered questions about *previous* forms and are not comparable with §2
+ (different context/pool sizes, different concurrency ceiling, indexer off, pre-SD-1
+ accounting):
 
-> **These figures belong to Form B and are not comparable with §2.** Different context
-> and pool size, different concurrency ceiling, indexer off, and a pre-SD-1 accounting
-> convention. The comparison document states its own scope.
-
-| benchmark | value |
-|---|---|
-| decode peak / mean (code, temp 0) | **100.3 / 81.4** · 99.8 / 81.2 tok/s (OFF · ON) |
-| prose OFF · ON | **33.3 · 36.6** tok/s |
-| prefill 8 K / 32 K / 100 K | **3102 / 3443 / 3253** t/s |
-| aggregate c1 / c4 / c8 / c12 | 82 / 223 / 295 / **398** tok/s (ON: 83 / 225 / 298 / 403) |
-| quality gates | needle 30 K–470 K ✅ · corruption 0/0/0 · termination 18/18 + 18/18 · code-gate 12/12 · GSM8K n=50 **1.00** |
-| DSpark acceptance | 3.98 tok/step, rate 0.595 (6.0 saturated on math) |
-| cold start | ~9 min, **no cold-start penalty** |
-
-**Long context** (cold prefill, needle-checked):
-
-| depth | result |
-|---|---|
-| 470 K | ✅ 211.7 s · 2144 t/s |
-| 600 K | ✅ 341.7 s |
-| **900 K** | ⚠️ **fails** in this form — the Engram row cache and the shared-expert pad buffer cost ~2 GB of deep-context headroom. 600 K and below are unaffected. |
-
-> The 900 K case is a **configuration capacity** limit, not engine accumulation:
-> it fails on a fresh engine too.
-
----
+- **Form B — tuned reference (1 M ctx / 5 M KV / C12, 2026-09-13)**: full six-stack
+ comparison moved to [docs/4DGX-dsv41-基准测试-横向对比-20260912.md](docs/4DGX-dsv41-基准测试-横向对比-20260912.md).
+ Its headline decode (100.3 tok/s), prefill (3102/3443/3253 t/s) and aggregate c1–c12
+ figures belong to that form only.
+- **PR-v2 / PR-v3@4096 / v14 / v18 PR boards**: kept as audit archives under
+ [`data/`](data/) (`sd1-20260918/pr/`, `prv3-20260918/`, `prv3-v14-20260919/`,
+ `prv3-v18-20260919/`) — quote §2 of this README instead.
 
 ## 6. Repo contents
 
@@ -379,7 +338,7 @@ Full six-stack comparison incl. LuZ / Vision-Exp / GLM:
   [§3.2 on the engine's prefill admission law](benchmarks/README.md)
 - `bench/` — gate suite (needle / corruption / termination / code-gate), vision gate,
   prose, GSM8K, third-party-shaped sweep, MoE numeric/capacity ladders
-- `data/` — **raw benchmark archives** under `data/sd1-20260918/` (DE matrix with
+- `data/` — **raw benchmark archives**: current authority `data/prv3-v19-40217prep-20260920/` (40/40 PR cells, per-stream raw records), then the lineage `prv3-v18-20260919/`, `prv3-v14-20260919/`, `prv3-20260918/`, the 2026-09-18 SD-1 arms under `sd1-20260918/` (DE matrix with
   per-stream records, the grammar A/B, the fp4 short-output arm, gateway-vs-direct,
   and the two GSM8K runs) plus **`data/prv3-v14-20260919/`** — the current PR-v3
   matrix, 40/40 cells at `chunk 8192` with per-stream raw records — and the two

@@ -1,0 +1,409 @@
+{
+ "run_tag": "prv3-v19-40217prep-20260920",
+ "build": "dsv41-sglang-optimized:0.2.5 (= v19-40217prep), image ID sha256:ab5a109f5f05..., content identity b4ca63d71bbe8557, 125 layers",
+ "change": "T1 #40217 minimal native port (dense indexer candidate mask bound to [tail<=128, lc]) + Z2 engram stats v2",
+ "protocol": "PR-v3 (SD-1 exception: native /generate + input_ids), max_new_tokens=1, per-request nonce, /flush_cache between cells, chunk 8192",
+ "aggregate": "total t/s = sum(prompt tokens of ok streams) / (max t_first - min t0)",
+ "cells": [
+  {
+   "inp": 512,
+   "conc": 1,
+   "n": 1,
+   "tok": 512,
+   "wall": 0.4,
+   "tps": 1279.9478261019747,
+   "ttft_first": 0.4,
+   "ttft_last": 0.4
+  },
+  {
+   "inp": 512,
+   "conc": 2,
+   "n": 2,
+   "tok": 1024,
+   "wall": 0.795,
+   "tps": 1288.066701226864,
+   "ttft_first": 0.412,
+   "ttft_last": 0.793
+  },
+  {
+   "inp": 512,
+   "conc": 4,
+   "n": 4,
+   "tok": 2048,
+   "wall": 1.798,
+   "tps": 1138.844945734284,
+   "ttft_first": 0.487,
+   "ttft_last": 1.797
+  },
+  {
+   "inp": 512,
+   "conc": 8,
+   "n": 8,
+   "tok": 4096,
+   "wall": 2.165,
+   "tps": 1891.8774329310706,
+   "ttft_first": 0.404,
+   "ttft_last": 2.164
+  },
+  {
+   "inp": 512,
+   "conc": 16,
+   "n": 16,
+   "tok": 8192,
+   "wall": 3.247,
+   "tps": 2523.3245998279467,
+   "ttft_first": 0.383,
+   "ttft_last": 3.231
+  },
+  {
+   "inp": 2048,
+   "conc": 1,
+   "n": 1,
+   "tok": 2048,
+   "wall": 0.64,
+   "tps": 3199.8720851230605,
+   "ttft_first": 0.64,
+   "ttft_last": 0.64
+  },
+  {
+   "inp": 2048,
+   "conc": 2,
+   "n": 2,
+   "tok": 4096,
+   "wall": 1.323,
+   "tps": 3095.844666973643,
+   "ttft_first": 0.683,
+   "ttft_last": 1.321
+  },
+  {
+   "inp": 2048,
+   "conc": 4,
+   "n": 4,
+   "tok": 8192,
+   "wall": 2.16,
+   "tps": 3792.6919540985537,
+   "ttft_first": 0.661,
+   "ttft_last": 2.159
+  },
+  {
+   "inp": 2048,
+   "conc": 8,
+   "n": 8,
+   "tok": 16384,
+   "wall": 4.269,
+   "tps": 3838.095557390178,
+   "ttft_first": 0.663,
+   "ttft_last": 4.246
+  },
+  {
+   "inp": 2048,
+   "conc": 16,
+   "n": 16,
+   "tok": 32768,
+   "wall": 8.453,
+   "tps": 3876.467395493282,
+   "ttft_first": 0.659,
+   "ttft_last": 8.419
+  },
+  {
+   "inp": 4096,
+   "conc": 1,
+   "n": 1,
+   "tok": 4096,
+   "wall": 0.999,
+   "tps": 4098.8938681855325,
+   "ttft_first": 0.999,
+   "ttft_last": 0.999
+  },
+  {
+   "inp": 4096,
+   "conc": 2,
+   "n": 2,
+   "tok": 8192,
+   "wall": 1.971,
+   "tps": 4156.297182119517,
+   "ttft_first": 0.99,
+   "ttft_last": 1.971
+  },
+  {
+   "inp": 4096,
+   "conc": 4,
+   "n": 4,
+   "tok": 16384,
+   "wall": 3.823,
+   "tps": 4285.388429476459,
+   "ttft_first": 0.989,
+   "ttft_last": 3.815
+  },
+  {
+   "inp": 4096,
+   "conc": 8,
+   "n": 8,
+   "tok": 32768,
+   "wall": 7.193,
+   "tps": 4555.606364537553,
+   "ttft_first": 0.971,
+   "ttft_last": 7.151
+  },
+  {
+   "inp": 4096,
+   "conc": 16,
+   "n": 16,
+   "tok": 65536,
+   "wall": 17.749,
+   "tps": 3692.467581189498,
+   "ttft_first": 1.002,
+   "ttft_last": 17.657
+  },
+  {
+   "inp": 8192,
+   "conc": 1,
+   "n": 1,
+   "tok": 8192,
+   "wall": 1.709,
+   "tps": 4794.183277395351,
+   "ttft_first": 1.709,
+   "ttft_last": 1.709
+  },
+  {
+   "inp": 8192,
+   "conc": 2,
+   "n": 2,
+   "tok": 16384,
+   "wall": 3.411,
+   "tps": 4803.2197346794155,
+   "ttft_first": 1.727,
+   "ttft_last": 3.411
+  },
+  {
+   "inp": 8192,
+   "conc": 4,
+   "n": 4,
+   "tok": 32768,
+   "wall": 6.949,
+   "tps": 4715.726271708842,
+   "ttft_first": 1.72,
+   "ttft_last": 6.918
+  },
+  {
+   "inp": 8192,
+   "conc": 8,
+   "n": 8,
+   "tok": 65536,
+   "wall": 19.443,
+   "tps": 3370.58792783581,
+   "ttft_first": 1.75,
+   "ttft_last": 19.378
+  },
+  {
+   "inp": 8192,
+   "conc": 16,
+   "n": 16,
+   "tok": 131072,
+   "wall": 31.313,
+   "tps": 4185.830757280975,
+   "ttft_first": 1.727,
+   "ttft_last": 31.134
+  },
+  {
+   "inp": 16384,
+   "conc": 1,
+   "n": 1,
+   "tok": 16384,
+   "wall": 5.775,
+   "tps": 2836.9596504604674,
+   "ttft_first": 5.775,
+   "ttft_last": 5.775
+  },
+  {
+   "inp": 16384,
+   "conc": 2,
+   "n": 2,
+   "tok": 32768,
+   "wall": 10.567,
+   "tps": 3100.9866209989236,
+   "ttft_first": 8.974,
+   "ttft_last": 10.548
+  },
+  {
+   "inp": 16384,
+   "conc": 4,
+   "n": 4,
+   "tok": 65536,
+   "wall": 15.516,
+   "tps": 4223.8087835663455,
+   "ttft_first": 6.952,
+   "ttft_last": 15.494
+  },
+  {
+   "inp": 16384,
+   "conc": 8,
+   "n": 8,
+   "tok": 131072,
+   "wall": 40.134,
+   "tps": 3265.838088069846,
+   "ttft_first": 8.08,
+   "ttft_last": 39.988
+  },
+  {
+   "inp": 16384,
+   "conc": 16,
+   "n": 16,
+   "tok": 262144,
+   "wall": 62.26,
+   "tps": 4210.489509239701,
+   "ttft_first": 6.886,
+   "ttft_last": 61.852
+  },
+  {
+   "inp": 32768,
+   "conc": 1,
+   "n": 1,
+   "tok": 32768,
+   "wall": 9.817,
+   "tps": 3337.9939717635866,
+   "ttft_first": 9.817,
+   "ttft_last": 9.817
+  },
+  {
+   "inp": 32768,
+   "conc": 2,
+   "n": 2,
+   "tok": 65536,
+   "wall": 19.086,
+   "tps": 3433.7994517730026,
+   "ttft_first": 11.526,
+   "ttft_last": 19.059
+  },
+  {
+   "inp": 32768,
+   "conc": 4,
+   "n": 4,
+   "tok": 131072,
+   "wall": 35.952,
+   "tps": 3645.772264527695,
+   "ttft_first": 10.057,
+   "ttft_last": 35.844
+  },
+  {
+   "inp": 32768,
+   "conc": 8,
+   "n": 8,
+   "tok": 262144,
+   "wall": 90.369,
+   "tps": 2900.821187773899,
+   "ttft_first": 12.139,
+   "ttft_last": 90.202
+  },
+  {
+   "inp": 32768,
+   "conc": 16,
+   "n": 16,
+   "tok": 524288,
+   "wall": 181.541,
+   "tps": 2887.9933609138907,
+   "ttft_first": 14.489,
+   "ttft_last": 180.815
+  },
+  {
+   "inp": 65536,
+   "conc": 1,
+   "n": 1,
+   "tok": 65536,
+   "wall": 22.602,
+   "tps": 2899.534296829924,
+   "ttft_first": 22.602,
+   "ttft_last": 22.602
+  },
+  {
+   "inp": 65536,
+   "conc": 2,
+   "n": 2,
+   "tok": 131072,
+   "wall": 44.825,
+   "tps": 2924.0837974000688,
+   "ttft_first": 26.276,
+   "ttft_last": 44.825
+  },
+  {
+   "inp": 65536,
+   "conc": 4,
+   "n": 4,
+   "tok": 262144,
+   "wall": 91.761,
+   "tps": 2856.80308176814,
+   "ttft_first": 26.589,
+   "ttft_last": 91.761
+  },
+  {
+   "inp": 65536,
+   "conc": 8,
+   "n": 8,
+   "tok": 524288,
+   "wall": 192.803,
+   "tps": 2719.293227064312,
+   "ttft_first": 27.214,
+   "ttft_last": 192.195
+  },
+  {
+   "inp": 65536,
+   "conc": 16,
+   "n": 16,
+   "tok": 1048576,
+   "wall": 390.503,
+   "tps": 2685.1931870803196,
+   "ttft_first": 29.087,
+   "ttft_last": 389.003
+  },
+  {
+   "inp": 131072,
+   "conc": 1,
+   "n": 1,
+   "tok": 131072,
+   "wall": 49.745,
+   "tps": 2634.8748535699974,
+   "ttft_first": 49.745,
+   "ttft_last": 49.745
+  },
+  {
+   "inp": 131072,
+   "conc": 2,
+   "n": 2,
+   "tok": 262144,
+   "wall": 102.408,
+   "tps": 2559.8098201543257,
+   "ttft_first": 53.972,
+   "ttft_last": 102.395
+  },
+  {
+   "inp": 131072,
+   "conc": 4,
+   "n": 4,
+   "tok": 524288,
+   "wall": 207.736,
+   "tps": 2523.823603986353,
+   "ttft_first": 53.355,
+   "ttft_last": 207.448
+  },
+  {
+   "inp": 131072,
+   "conc": 8,
+   "n": 8,
+   "tok": 1048576,
+   "wall": 424.96,
+   "tps": 2467.4675017064537,
+   "ttft_first": 50.676,
+   "ttft_last": 424.186
+  },
+  {
+   "inp": 131072,
+   "conc": 16,
+   "n": 16,
+   "tok": 2097152,
+   "wall": 833.135,
+   "tps": 2517.180662632476,
+   "ttft_first": 63.443,
+   "ttft_last": 830.165
+  }
+ ]
+}
