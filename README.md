@@ -60,33 +60,35 @@ and [`data/sd1-20260918/`](data/sd1-20260918/).
 ### DE decode, per stream (4 prompt-label types, no grammar, force-filled budget)
 
 4 types × 5 concurrencies × 3 waves; cell value = `statistics.median` over every ok
-stream of every wave. Full 20-cell table with aggregates and TTFT in
-[FINAL-METRICS §4](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md).
+stream of every wave. Full 20-cell table with aggregates, total-throughput view and
+TTFT in [FINAL-METRICS §4](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md).
 
 | Type | C=1 | C=2 | C=4 | C=8 | C=16 | wave spread |
 |---|---:|---:|---:|---:|---:|---:|
-| code | **83.59** | 65.39 | 56.41 | 41.34 | **34.97** | ±2.2–±6.1% |
-| json | 76.20 | 64.85 | 50.18 | 33.64 | 29.90 | ±0.5–±4.0% |
-| structured | 56.41 | 44.41 | 42.25 | 27.42 | 21.31 | **±17.7–±45.0%** |
-| prose | 45.84 | 35.74 | 27.20 | 17.89 | 14.80 | ±0.8–±7.4% |
+| code | **88.37** | 71.47 | 58.98 | 42.30 | 36.16 | ±3.5–±9.3% |
+| json | **81.55** | 65.16 | 52.25 | 35.64 | 30.70 | ±0.4–±2.1% |
+| structured | **74.40** | 51.36 | 38.81 | 28.24 | 20.23 | ±8.4–±43.5% |
+| prose | **49.09** | 38.34 | 28.08 | 18.37 | 15.11 | ±0.7–±8.3% |
 
 > **`structured` here is a prompt label, not a grammar constraint.** Ranking
-> `code > json > structured > prose` holds at all five concurrencies, but only **11 of the 15**
-> adjacent gaps clear their own error bar — at C1/C2 only `code` vs `prose` resolves.
-> **Read the spread column before comparing two rows.** The cause of `structured`'s
-> spread is *not identified*, and no table here claims one.
+> `code > json > structured > prose` holds at all five concurrencies. `structured`
+> remains the only unstable type (wave spread ±8.4–±43.5% vs ≤±9.3% for the others);
+> the cause is *not identified*.
+> **DE aggregate total throughput (Σ output tokens ÷ Σ wave wall): peak 543.9 t/s at
+> code × C16** — 543.9 / 481.0 / 262.8 / 236.4 (code / json / structured / prose);
+> vs the v14 same-formula recompute 528.5, that is **+2.9%**.
 
 ### PR — pure-prefill total throughput (PR-v3, all 40 cells) — [FINAL-METRICS §3](docs/03-final-metrics/FINAL-METRICS-600K-2026-09-18.md)
 
-> ⚠️ **The PR table was re-measured twice and rewritten.** The PR-v2 matrix was
-> withdrawn as a baseline on 2026-09-18 (no cache flush, parallel-vs-queued
-> indistinguishable, per-stream columns); the first PR-v3 pass (34/35 cells,
-> `--chunked-prefill-size 4096`, peak 3,337.6 t/s at 8192×C1) was in turn **superseded
-> on 2026-09-19** by a full re-run at **`--chunked-prefill-size 8192`**: 40/40 cells
-> (8 input sizes × 5 concurrencies, 512 row added, 131072×C16 completed). Both
-> superseded archives are kept under [`data/sd1-20260918/pr/`](data/sd1-20260918/pr/)
-> and [`data/prv3-20260918/`](data/prv3-20260918/) for audit; **quote the v14 table
-> below and nothing else**.
+> ⚠️ **The PR table was re-measured three times.** PR-v2 was withdrawn on 2026-09-18
+> (no cache flush, parallel-vs-queued indistinguishable, per-stream columns); PR-v3
+> pass 1 (34/35 cells, `--chunked-prefill-size 4096`) was superseded on 2026-09-19 by
+> the v14 full re-run at chunk 8192; v14 was in turn **succeeded on 2026-09-19/20 by
+> the v18 (0.2.4, MoE W4A8-MX) re-run** — same protocol, same chunk, 40/40 cells.
+> Superseded archives: [`data/sd1-20260918/pr/`](data/sd1-20260918/pr/),
+> [`data/prv3-20260918/`](data/prv3-20260918/) and
+> [`data/prv3-v14-20260919/`](data/prv3-v14-20260919/) (same-window comparison
+> baseline). **Quote the v18 table below and nothing else.**
 
 PR-v3 measures what a load generator actually cares about: **total prompt tokens
 divided by the wall clock from releasing the first stream to the last stream
@@ -95,36 +97,42 @@ every request and a `POST /flush_cache` between cells.
 
 | Input tokens | C1 | C2 | C4 | C8 | C16 |
 |---:|---:|---:|---:|---:|---:|
-| 512 | 1211.1 | 1316.0 | 1845.5 | 2311.5 | **2468.9** |
-| 2,048 | 2607.5 | 2652.0 | **2899.7** | 2451.1 | 2705.8 |
-| 4,096 | 3111.8 | **3288.5** | 2871.8 | 3107.0 | 2931.8 |
-| 8,192 | 2667.5 | 2849.1 | **3326.4** | 3087.8 | 2863.1 |
-| 16,384 | **3025.7** | 2516.1 | 2183.4 | 2171.2 | 1915.1 |
-| 32,768 | **1963.0** | 1688.3 | 1704.9 | 1650.1 | 1690.4 |
-| 65,536 | **1697.3** | 1463.4 | 1487.6 | 1497.7 | 1537.3 |
-| 131,072 | **1770.0** | 1795.7 | 1536.7 | 1366.9 | 1560.2 |
+| 512 | 1214.2 | 1236.3 | 1795.8 | **1879.3** | 1629.7 |
+| 2,048 | 3076.7 | **3168.1** | 3059.7 | 2261.9 | 2932.7 |
+| 4,096 | 4047.6 | **4299.6** | 3507.6 | 3947.7 | 4043.4 |
+| 8,192 | 3315.7 | 3532.8 | 3041.9 | **3704.1** | 3585.1 |
+| 16,384 | 2341.4 | 3669.6 | **3718.2** | 3694.0 | 2853.5 |
+| 32,768 | 2621.7 | **2835.0** | 2595.6 | 2698.3 | 2673.1 |
+| 65,536 | 3052.9 | 2648.1 | 2565.3 | **3474.6** | 2569.7 |
+| 131,072 | 1835.9 | 2420.9 | 2334.0 | 2297.6 | **2508.1** |
+| 524,288 (single stream) | 2257.2 | — | — | — | — |
 
 **Is it really concurrent, or just queued?** Answered per cell from the archived
 per-stream first-token instants, not from a sampled counter
 ([`benchmarks/pr_v3_concurrency.py`](benchmarks/pr_v3_concurrency.py)). Under
 `chunk=8192` the admission law `min(C, max(1, floor(8192/input)))` holds exactly in
-**35/40 cells** — and **no cell ever exceeds it**; the five shortfalls are arrival
-effects in tiny-prompt cells (a 512-token wave spans ~6 ms while a scheduler step is
-sub-millisecond), not policy violations. Real parallel prefill steps appear in **11
-cells** (512: width up to 13 · 2048: width up to 4 · 4096: width 2); above 4,096
-tokens every multi-stream cell (**21 of 32**) still ran **one request at a time**,
-because a prompt longer than the step budget occupies the scheduler alone. So the
-upper rows of this table are genuinely parallel, and the long-input rows are the
-wall-clock throughput of **serialized admission** — an engine policy, not a client
-defect.
+**27/40 cells** — and **no cell ever exceeds it**; all 13 deviations sit in the
+arrival-dominated small-prompt band: 10 cells fall *below* the law (whole batches
+arrived merged into one scheduler step), and 3 cells show a step width of 2 where the
+law predicts 1 (`--enable-mixed-chunk` lets a decode ride along on the prefill step —
+wall-clock matches serialized service time, so this is **not** prefill parallelism).
+Real parallel prefill steps appear in **11 cells** (512-row: width up to 13 · 2048:
+up to 4 · 4096: width 2). Above 4,096 tokens, multi-stream cells run **one request at
+a time** — a prompt longer than the step budget occupies the scheduler alone. So the
+upper rows are genuinely parallel, and the long-input rows are the wall-clock
+throughput of **serialized admission** — an engine policy, not a client defect.
 
-Consequences: at 512–4096 tokens, concurrency pays everywhere (512-row **+103.9 %**
-C1→C16 — a row the 4096-chunk runs never covered); the old flat-8192-row pattern is
-gone — the 8,192 row now peaks at **C4** (TTFT is flat ≈2.5 s across C4–C16 while
-total t/s rises to 3,326.4); 16,384×C1 gains **+56.2 %** over the 4096-chunk build.
-Above 32 K, inputs still converge into a narrow band — 1,367–1,963 tok/s. One wave
-per cell means **no error bar**, so gaps inside that band are unresolved rather than
-ranked.
+Consequences: the **whole-board peak moves to 4,299.6 t/s (4096 × C2**, **+29.3 %**
+over the v14 peak 3,326.4 at 8192 × C4). Long inputs gain the most: the 65,536 row
+climbs **+67 %…+132 %** (C8 3,474.6) and 131,072×C16 **+60.8 %** (2,508.1); the 4096
+row is up **+30 %…+38 %** at every concurrency. The 512 row is the one regression,
+**−3 %…−34 %** (C16 1,629.7), and its C8 > C16 inversion is a single-wave outlier
+already queued for re-measurement. Above 32 K, inputs converge into a narrow band —
+2,298–2,835 tok/s. One wave per cell means **no error bar**, so gaps inside that band
+are unresolved rather than ranked.
+
+> The 524,288 row is single-stream by design: longer multi-stream cells are not
+> promised — the old C16 attempt hit 5,955 s TTFT.
 
 ### Gateway and short-output arms
 
@@ -135,16 +143,17 @@ ranked.
 
 ### Headline figures
 
-**Total throughput — the two numbers to quote: DE aggregate decode peak 537.5 t/s
-(code, C16) · PR pure-prefill total throughput peak 3,326.4 t/s (8192 × C4,
-chunk 8192).**
+**Total throughput — the two numbers to quote: DE aggregate decode peak 543.9 t/s
+(code, C16, v18/0.2.4) · PR pure-prefill total throughput peak 4,299.6 t/s
+(4096 × C2, chunk 8192, v18/0.2.4 baseline).**
 
 | metric | value |
 |---|---|
-| **DE aggregate decode peak (total throughput)** | **537.5 t/s** (code, C16) |
-| **PR total throughput peak (pure prefill, PR-v3 @ chunk 8192)** | **3,326.4 t/s** (8192 × C4) · runner-up **3,288.5 t/s** (4096 × C2) · best small-prompt cell **2,468.9 t/s** (512 × C16) |
-| PR concurrency verdict | real parallel steps in 11/40 cells (512 up to width 13 · 2048 up to 4 · 4096 width 2); 21/32 multi-stream cells above 4096 tokens serialized |
-| single-stream decode peak | **83.59 t/s** (code, C1) |
+| **DE aggregate decode peak (total throughput)** | **543.9 t/s** (code, C16, v18) · v14 same-formula recompute 528.5 (+2.9%) — per-stream C1 peak 88.37 t/s (code) |
+| **PR total throughput peak (pure prefill, PR-v3 @ chunk 8192, v18)** | **4,299.6 t/s** (4096 × C2) · runner-up **4,047.6 t/s** (4096 × C1) · best small-prompt cell **1,879.3 t/s** (512 × C8) |
+| PR concurrency verdict (v18) | real parallel steps in 11/40 cells (512 up to width 13 · 2048 up to 4 · 4096 width 2); multi-stream cells above 4096 tokens serialize; admission law 27/40 exact, none above |
+| PR vs v14 (same window, same chunk) | peak **+29.3 %** · 4096 row +30…+38 % · 65536 row +67…+132 % · 131072×C16 +60.8 % · 512 row −3…−34 % (re-measurement queued) |
+| single-stream decode peak (v18) | **88.37 t/s** (code, C1) — was 83.59 in v14 (+5.7%) |
 | GSM8K, 200 questions | **0.9600** (192/200) · temp 0.6, 8-shot · indexer off |
 | engine cold start | **345.7 s ≈ 5.8 min** (`tokenizer_e2e`) |
 
