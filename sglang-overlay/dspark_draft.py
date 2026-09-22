@@ -142,6 +142,14 @@ def sample_draft_block(
     any_sampling = sampling_info is not None and not sampling_info.is_all_greedy
     fast_sampling = envs.SGLANG_DSPARK_FAST_SAMPLING.get()
 
+    def mask_mm_sentinels(step_logits: torch.Tensor) -> torch.Tensor:
+        # Multimodal input placeholder IDs are never valid assistant output.
+        # Mask them on the draft side too so a corrupted verify stage cannot
+        # accept a placeholder proposal that was never legitimately proposed.
+        step_logits[..., 128847:129271] = -torch.inf
+        step_logits[..., 129279] = -torch.inf
+        return step_logits
+
     if sampling_info is None:
         temperatures = torch.ones(bs, dtype=torch.float32, device=device)
     else:
@@ -154,13 +162,15 @@ def sample_draft_block(
         def sampler(step_logits: torch.Tensor, step_idx: int) -> torch.Tensor:
             expect(_DRAFT_STEP_LOGITS, step_logits, msg=f"step {step_idx}")
             return tp_sync.sync(
-                SpecTpSyncSite.DSPARK_DRAFT_GREEDY, torch.argmax(step_logits, dim=-1)
+                SpecTpSyncSite.DSPARK_DRAFT_GREEDY,
+                torch.argmax(mask_mm_sentinels(step_logits), dim=-1),
             )
 
     else:
 
         def sampler(step_logits: torch.Tensor, step_idx: int) -> torch.Tensor:
             expect(_DRAFT_STEP_LOGITS, step_logits, msg=f"step {step_idx}")
+            step_logits = mask_mm_sentinels(step_logits)
             if fast_sampling:
                 exp_noise = torch.empty(
                     step_logits.shape, dtype=torch.float32, device=step_logits.device

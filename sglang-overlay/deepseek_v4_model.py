@@ -4505,6 +4505,13 @@ class DeepseekV4ForCausalLM(nn.Module):
                 None if aux_hidden_states is not None else pre_hc_head
             ),
         )
+        if output.next_token_logits is not None:
+            # These in-vocabulary tokens are multimodal input sentinels, not
+            # valid assistant output. SGLang does not apply the checkpoint's
+            # special-token suppression, so rare logits corruption or sampling
+            # noise can otherwise leak <|place_holder_mm_span_*|> to clients.
+            output.next_token_logits[..., 128847:129271] = -torch.inf
+            output.next_token_logits[..., 129279] = -torch.inf
         if tail_token_indices is not None:
             output.hidden_states_token_indices = tail_token_indices
         return output
