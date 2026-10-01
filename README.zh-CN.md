@@ -1,19 +1,21 @@
 # LuZ-0.1.7-DSV41F · DeepSeek-V4.1-Flash（SGLang）· 4× DGX Spark TP4 · 无交换机环网
-> ### 📥 镜像下载（13.0 GiB）
+> ### 📥 镜像下载（13.1 GiB）
 >
-> **[⬇ LuZ-0.2.8-dsv41-tp4-dgxspark.tar — 夸克网盘](https://pan.quark.cn/s/ca93fedc6376)** · 提取码 `RHdj` · 备用 **[百度网盘](https://pan.baidu.com/s/17IDk222FbLkLKTIqBJ6AzQ?pwd=luzi)** · 提取码 `luzi`
+> **[⬇ LuZ-0.2.9-dsv41-tp4-dgxspark.tar — 夸克网盘](https://pan.quark.cn/s/aa6b189231e3)** · 备用 **[百度网盘](https://pan.baidu.com/s/1-LvoV_xtF4hJKp5qaQH90g?pwd=luzi)** · 提取码 `luzi`
 >
-> MD5 `a9d4cdf932203f173df7556aa511fee1` · 内容身份 `4cca364c46778423` · 校验与安装：**[镜像下载 → §7](#7-镜像下载发布件)**
+> SHA256 `c1840255408f8b8b012279153580d1310f5d7d9bc4f5aa4e4181bcc8bf23fb0d` · MD5 `3562a789ec0e9aa4bc80a7e54ba1be65` · 内容身份 `355a5e45cb2725ae` · 校验与安装：**[镜像下载 → §7](#7-镜像下载发布件)**
 
 
-**仓库版本 v0.2.8**（2026-09-24），见[版本更新报告](docs/release-notes/RELEASE-NOTES-v0.2.8.md)。
-镜像现为 `dsv41-sglang-optimized:0.2.8`（内容身份 `4cca364c46778423`，3 层）：
-**OOM 期工程收口**（FIX-B/B′ 空闲释放与调度快照钩子、FIX-D 宽度分桶、`mm_ban`、
-R2 page_table 网格、以及 #40352 候选块协议语义级回移——默认关）。
-这是一次**纯增量——相对 0.2.4 无任何削减**——并已端到端重测：PR 全 40 格矩阵
-（峰值 **5,823.1 t/s**）与 DE 20/20 格全为正。镜像**已重新打包供下载**（见下）。
+**仓库版本 v0.2.9**（2026-09-30），见[版本更新报告](docs/release-notes/RELEASE-NOTES-v0.2.9.md)。
+镜像现为 `dsv41-sglang-optimized:0.2.9-ep1q2-fin2`（内容身份 `355a5e45cb2725ae`，**5 层**）：
+**旧基座的最后稳定版**，也是 **EP1 使能链**（`EP_SIZE` 2→1，`DSV41_MOE_B12X` 1→0）
+并烘入 P1a 三件 adapter（`draft_head_fp8_tp4`、`hc_fused`、`draft_tau`）。
+解码 **c8 +4.0 % / c12 +4.8 %**；262k/131k 预填在靴噪声带内持平；QA 17/0。镜像**已重新打包供下载**（见下）。
 
-在 **4× NVIDIA DGX Spark（GB10）无交换机 RoCE 环网**上以 **SGLang TP4 / EP2** 部署
+> ⚠️ **0.2.9 未重跑 PR 矩阵**，且其解码数字来自**与 0.2.8 不同的基座** —— 两张表**不可比**，
+> 不要把它们归一成一张表。0.2.8 的 50 格矩阵仍是**该基座**的矩阵权威。
+
+在 **4× NVIDIA DGX Spark（GB10）无交换机 RoCE 环网**上以 **SGLang TP4** 部署
 **deepseek-ai/DeepSeek-V4.1-Flash** 的生产方案。该模型为 ~550 B 参数 MoE
 （40 层、每层 384 个路由专家、top-6 路由 + 1 个共享专家、MXFP4 专家权重、
 原生 1 M 上下文、DSpark 投机解码）。
@@ -32,7 +34,20 @@ English → **[README.md](README.md)** · 完整文档 → **[docs/](docs/)** ·
 下面的数字都标注了**测得它时的构建形态**。本仓库出现过多个形态，它们
 **不可互换**——引用前先看标签。
 
-当前生产（下文标注 *0.2.8* 的数字全部测于该构建）：
+**当前发布（v0.2.9，2026-09-30）—— 镜像与 EP1 使能链：**
+
+| | 值 |
+|---|---|
+| 镜像 | `dsv41-sglang-optimized:0.2.9-ep1q2-fin2` —— 内容身份 **`355a5e45cb2725ae`**（**5 层**） |
+| 相对 `ep1q2-fin` 的改动 | **EP1 使能链**（`EP_SIZE` 2→1、`DSV41_MOE_B12X` 1→0）＋ P1a 三件 adapter（`draft_head_fp8_tp4`、`hc_fused`、`draft_tau`）＋ memwatch ＋ PREFLIGHT `v1-fin2` ＋ 16 闸横幅 |
+| 实测（对照 `ep1q2-fin`） | DE prose **c8 +4.0 % · c12 +4.8 %**；PR 262k/131k 在靴噪声带内持平；QA **17/0** |
+| 它是什么 | **旧基座的最后稳定版** —— 新基座工作（LuZ-0.3.0）是另一条线 |
+| 完整文档 | [docs/release-notes/RELEASE-NOTES-v0.2.9.md](docs/release-notes/RELEASE-NOTES-v0.2.9.md) |
+
+> ⚠️ **0.2.9 未重跑 PR 矩阵**，且其解码数字来自**与 0.2.8 不同的基座**。两张表**不可比** ——
+> 不要把它们归一成一张表。0.2.8 的 50 格矩阵仍是**该（0.2.8）基座**的矩阵权威。
+
+**矩阵权威 —— 下文所有标注 *0.2.8* 的数字都测于这个形态：**
 
 | | 值 |
 |---|---|
@@ -383,22 +398,58 @@ b12x 是消费级 Blackwell（SM120/SM121）的 CuTe-DSL 内核库：NVFP4/MXFP4
 
 ## 7. 镜像下载（发布件）
 
-服务镜像（**13.0 GiB**）经网盘分发（双通道）：
+**当前发布件 —— `v0.2.9`（2026-09-30）。** 服务镜像（**13.1 GiB**）经网盘分发（双通道）：
+
+- **夸克网盘**：https://pan.quark.cn/s/aa6b189231e3
+- **百度网盘**：https://pan.baidu.com/s/1-LvoV_xtF4hJKp5qaQH90g?pwd=luzi（提取码 `luzi`）
+- **文件**：`LuZ-0.2.9-dsv41-tp4-dgxspark.tar` —— **未压缩 OCI tar**，`docker load -i` 无需 `zstd`
+- **大小**：14,055,778,304 字节（13.09 GiB）
+- **SHA256**：`c1840255408f8b8b012279153580d1310f5d7d9bc4f5aa4e4181bcc8bf23fb0d`
+- **MD5**：`3562a789ec0e9aa4bc80a7e54ba1be65`
+- **内容身份**：**`355a5e45cb2725ae`**（**5 层**）—— 载入后还原为
+  `dsv41-sglang-optimized:0.2.9-ep1q2-fin2`
+
+该文件的离线审计与身份数据落档在
+[`data/release-artifact-20260930/`](data/release-artifact-20260930/)。
+
+**四机分发校验**（部署之后、信任任何基准数字之前先跑；随本次发布分发 —— 见
+[`scripts/verify_fleet_distribution.sh`](scripts/verify_fleet_distribution.sh)）：
+
+```bash
+./scripts/verify_fleet_distribution.sh \
+  --image dsv41-sglang-optimized:0.2.9-ep1q2-fin2 \
+  --identity 355a5e45cb2725ae --expect-layer-count 5 \
+  --nodes <head-node> <worker-rank1> <worker-rank2> <worker-rank3>
+# → four nodes agree, and agree across nodes ⇒ RESULT: PASS (exit 0)
+```
+
+它**先断言存在、再断言身份**。对**不存在的镜像**跑 `docker image inspect … | sha256sum`
+**不会失败** —— 它会返回一个看着很像样的常量（`e3b0c442…` = `sha256("")`、
+`01ba4719…` = `sha256("\n")`），于是两台**都缺该镜像**的机器会**通过**朴素的比对。
+因此身份**永不**从缺失的镜像上计算。
+
+然后在四台机器上分别载入（**四台都需要**该镜像）并按内容身份自检：
+
+```bash
+docker load -i LuZ-0.2.9-dsv41-tp4-dgxspark.tar   # 还原为 dsv41-sglang-optimized:0.2.9-ep1q2-fin2
+docker image inspect -f '{{join .RootFS.Layers " "}}' dsv41-sglang-optimized:0.2.9-ep1q2-fin2 \
+  | sha256sum | cut -c1-16      # 期望：355a5e45cb2725ae
+```
+
+**上一发布件 —— `v0.2.8`（2026-09-24）**，保留的原因是其 50 格 PR 矩阵仍是**该基座**的矩阵权威：
 
 - **夸克网盘**：https://pan.quark.cn/s/ca93fedc6376（提取码 `RHdj`）
 - **百度网盘**：https://pan.baidu.com/s/17IDk222FbLkLKTIqBJ6AzQ?pwd=luzi（提取码 `luzi`）
-- **文件**：`LuZ-0.2.8-dsv41-tp4-dgxspark.tar` —— **未压缩 OCI tar**，`docker load -i` 无需 `zstd`
+- **文件**：`LuZ-0.2.8-dsv41-tp4-dgxspark.tar`
 - **大小**：14,002,663,936 字节（13.0 GiB）
 - **MD5**：`a9d4cdf932203f173df7556aa511fee1`
 - **SHA256**：`6c94745b261eb01a6bea9864af443d0e89583562c624926b30f9dfbc771ec3a4`
-- **镜像内容身份**：**`4cca364c46778423`**（3 层）—— 与四台生产机报出的值完全一致，
-  且**可由发布包本身离线复现**。该 tar 是 14 个成员的 OCI 布局（9 个 blob +
-  `index.json` + `manifest.json` + `oci-layout` + 2 个目录项）；载入后还原为
-  `dsv41-sglang-optimized:0.2.8`。
+- **内容身份**：**`4cca364c46778423`**（3 层）—— 14 个成员的 OCI 布局（9 个 blob +
+  `index.json` + `manifest.json` + `oci-layout` + 2 个目录项）。
 
-> **认哈希，不要认文件名或体积。** 0.2.8 包与 0.2.4 包只差 604,160 字节（+0.0043%）
-> ——**不足以**靠肉眼区分两个版本。该文件的离线审计记录（md5、9/9 blob 摘要、层链、
-> 身份复现）已随仓库落档在
+> **认哈希，不要认文件名或体积。** 相邻版本几乎无法凭体积区分：0.2.8 与 0.2.4 只差
+> 604,160 字节（+0.0043 %），0.2.9 与 0.2.8 只差 +0.38 %。0.2.8 文件的离线审计记录
+> （md5、9/9 blob 摘要、层链、身份复现）已随仓库落档在
 > [`data/release-artifact-20260923/`](data/release-artifact-20260923/)。
 
 载入之前先**离线自证**（无需集群、无需 docker 守护进程、无需 GPU）：

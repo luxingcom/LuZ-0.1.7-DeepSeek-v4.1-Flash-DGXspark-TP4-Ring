@@ -1,23 +1,25 @@
 # LuZ-0.1.7-DSV41F · DeepSeek-V4.1-Flash on 4× DGX Spark · TP4 switchless RoCE ring
-> ### 📥 Download the serving image (13.0 GiB)
+> ### 📥 Download the serving image (13.1 GiB)
 >
-> **[⬇ LuZ-0.2.8-dsv41-tp4-dgxspark.tar — Quark Drive](https://pan.quark.cn/s/ca93fedc6376)** · code `RHdj` · mirror **[Baidu Netdisk](https://pan.baidu.com/s/17IDk222FbLkLKTIqBJ6AzQ?pwd=luzi)** · code `luzi`
+> **[⬇ LuZ-0.2.9-dsv41-tp4-dgxspark.tar — Quark Drive](https://pan.quark.cn/s/aa6b189231e3)** · mirror **[Baidu Netdisk](https://pan.baidu.com/s/1-LvoV_xtF4hJKp5qaQH90g?pwd=luzi)** · code `luzi`
 >
-> MD5 `a9d4cdf932203f173df7556aa511fee1` · content identity `4cca364c46778423` · verify & install: **[Image download → §7](#7-image-download-release-artifact)**
+> SHA256 `c1840255408f8b8b012279153580d1310f5d7d9bc4f5aa4e4181bcc8bf23fb0d` · MD5 `3562a789ec0e9aa4bc80a7e54ba1be65` · content identity `355a5e45cb2725ae` · verify & install: **[Image download → §7](#7-image-download-release-artifact)**
 
 
-**Repo version: v0.2.8** (2026-09-24) — see the
-[release notes](docs/release-notes/RELEASE-NOTES-v0.2.8.md). Image is now `dsv41-sglang-optimized:0.2.8`
-(content identity `4cca364c46778423`, 3 layers): the **OOM-era engineering close-out**
-(FIX-B/B' idle-release & snapshot hook, FIX-D width bucketing, `mm_ban`, R2 page-table grid,
-and the #40352 candidate-block protocol backport — default off). It is a **pure increment —
-nothing reduced vs 0.2.4** — re-measured end to end: PR full 40-cell matrix (peak
-**5,823.1 t/s**) and DE 20/20 cells positive. The image is **packaged for download again** (below).
+**Repo version: v0.2.9** (2026-09-30) — see the
+[release notes](docs/release-notes/RELEASE-NOTES-v0.2.9.md). Image is now `dsv41-sglang-optimized:0.2.9-ep1q2-fin2`
+(content identity `355a5e45cb2725ae`, 5 layers): **the last stable build of the old base**, and the
+**EP1 enablement chain** (`EP_SIZE` 2→1 with `DSV41_MOE_B12X` 1→0) plus the P1a adapter trio
+(`draft_head_fp8_tp4`, `hc_fused`, `draft_tau`) baked in. Decode **c8 +4.0 % / c12 +4.8 %**;
+262k/131k prefill flat inside boot noise; QA 17/0. The image is **packaged for download again** (below).
+
+The 0.2.8 release remains the last **50-cell PR matrix board** and is kept as its own record —
+its numbers belong to the 0.2.8 base and must not be mixed with 0.2.9's.
 
 Production recipe for serving **deepseek-ai/DeepSeek-V4.1-Flash** — a ~550 B-parameter
 MoE (40 layers, 384 routed experts/layer, top-6 routing + 1 shared expert, MXFP4
-expert weights, 1 M native context, DSpark speculative decoding) — with **SGLang TP4
-/ EP2** across **4× NVIDIA DGX Spark (GB10)** wired as a **switchless RoCE ring**
+expert weights, 1 M native context, DSpark speculative decoding) — with **SGLang TP4**
+across **4× NVIDIA DGX Spark (GB10)** wired as a **switchless RoCE ring**
 (no 400 G switch).
 
 This repo is a **ring adaptation + operations layer + kernel overlay** on top of the
@@ -32,10 +34,24 @@ benchmark archives. **No weights, no images, no NCCL binaries.**
 
 ## 1. What is running right now
 
-Every number below is tagged with the **build form it was measured on**. Two forms
+Every number below is tagged with the **build form it was measured on**. Three forms
 appear in this repo and they are *not* interchangeable — read the tag before quoting.
 
-Current production (what every number tagged *0.2.8* below was measured on):
+Current release (**v0.2.9**, 2026-09-30) — the image and the EP1 chain:
+
+| | value |
+|---|---|
+| image | `dsv41-sglang-optimized:0.2.9-ep1q2-fin2` — content identity **`355a5e45cb2725ae`** (**5 layers**) |
+| change vs `ep1q2-fin` | **EP1 enablement chain** (`EP_SIZE` 2→1, `DSV41_MOE_B12X` 1→0) + P1a adapter trio (`draft_head_fp8_tp4`, `hc_fused`, `draft_tau`) + memwatch + PREFLIGHT `v1-fin2` + 16-gate banner |
+| measured (vs `ep1q2-fin`) | DE prose **c8 +4.0 % · c12 +4.8 %**; PR 262k/131k flat inside boot noise; QA **17/0** |
+| what it is | **the last stable build of the old base** — new-base work (LuZ-0.3.0) is a separate line |
+| full doc | [docs/release-notes/RELEASE-NOTES-v0.2.9.md](docs/release-notes/RELEASE-NOTES-v0.2.9.md) |
+
+> ⚠️ **0.2.9 did not re-run the PR matrix**, and its decode numbers come from a different
+> base than 0.2.8's. The two boards are **not comparable** — do not normalize them into
+> one table. 0.2.8's 50-cell board remains the matrix of record *for the 0.2.8 base*.
+
+Matrix of record — what every number tagged *0.2.8* below was measured on:
 
 | | value |
 |---|---|
@@ -455,24 +471,63 @@ answered questions about *previous* forms and are not comparable with §2
 
 ## 7. Image download (release artifact)
 
-The serving image (**13.0 GiB**) is distributed via cloud drive (two mirrors):
+**Current artifact — `v0.2.9` (2026-09-30).** The serving image (**13.1 GiB**) is distributed
+via cloud drive (two mirrors):
+
+- **Quark Drive**: https://pan.quark.cn/s/aa6b189231e3
+- **Baidu Netdisk**: https://pan.baidu.com/s/1-LvoV_xtF4hJKp5qaQH90g?pwd=luzi (extract code: `luzi`)
+- **File**: `LuZ-0.2.9-dsv41-tp4-dgxspark.tar` — a **plain (uncompressed) OCI tar**, so
+  `docker load -i` works without `zstd`
+- **Size**: 14,055,778,304 bytes (13.09 GiB)
+- **SHA256**: `c1840255408f8b8b012279153580d1310f5d7d9bc4f5aa4e4181bcc8bf23fb0d`
+- **MD5**: `3562a789ec0e9aa4bc80a7e54ba1be65`
+- **Content identity**: **`355a5e45cb2725ae`** (**5 layers**) — loading it restores
+  `dsv41-sglang-optimized:0.2.9-ep1q2-fin2`.
+
+Recorded offline audit and identity data for this file:
+[`data/release-artifact-20260930/`](data/release-artifact-20260930/).
+
+**Fleet-wide distribution check** (run after deploying, before you trust a benchmark
+number; shipped with this release — see
+[`scripts/verify_fleet_distribution.sh`](scripts/verify_fleet_distribution.sh)):
+
+```bash
+./scripts/verify_fleet_distribution.sh \
+  --image dsv41-sglang-optimized:0.2.9-ep1q2-fin2 \
+  --identity 355a5e45cb2725ae --expect-layer-count 5 \
+  --nodes <head-node> <worker-rank1> <worker-rank2> <worker-rank3>
+# → four nodes agree, and agree across nodes ⇒ RESULT: PASS (exit 0)
+```
+
+It asserts **presence first, then identity**. `docker image inspect … | sha256sum` on a
+missing image does not fail — it returns a plausible constant (`e3b0c442…` = `sha256("")`,
+`01ba4719…` = `sha256("\n")`), so two nodes both missing the image would **pass** a naive
+comparison. Identity is therefore never computed from a missing image.
+
+Then load on all four nodes (all of them need the image) and re-check identity locally:
+
+```bash
+docker load -i LuZ-0.2.9-dsv41-tp4-dgxspark.tar   # restores dsv41-sglang-optimized:0.2.9-ep1q2-fin2
+docker image inspect -f '{{join .RootFS.Layers " "}}' dsv41-sglang-optimized:0.2.9-ep1q2-fin2 \
+  | sha256sum | cut -c1-16      # expect: 355a5e45cb2725ae
+```
+
+**Previous artifact — `v0.2.8` (2026-09-24)**, kept because its 50-cell PR matrix is the
+matrix of record for that base:
 
 - **Quark Drive**: https://pan.quark.cn/s/ca93fedc6376 (extract code: `RHdj`)
 - **Baidu Netdisk**: https://pan.baidu.com/s/17IDk222FbLkLKTIqBJ6AzQ?pwd=luzi (extract code: `luzi`)
-- **File**: `LuZ-0.2.8-dsv41-tp4-dgxspark.tar` — a **plain (uncompressed) OCI tar**, so
-  `docker load -i` works without `zstd`
+- **File**: `LuZ-0.2.8-dsv41-tp4-dgxspark.tar`
 - **Size**: 14,002,663,936 bytes (13.0 GiB / 13.04 GiB)
 - **MD5**: `a9d4cdf932203f173df7556aa511fee1`
 - **SHA256**: `6c94745b261eb01a6bea9864af443d0e89583562c624926b30f9dfbc771ec3a4`
-- **Content identity**: **`4cca364c46778423`** (3 layers) — the value all four production
-  nodes report, **re-derivable offline from the archive itself**. The tar is a
-  14-member OCI layout (9 blobs + `index.json` + `manifest.json` + `oci-layout` + 2
-  directory entries); loading it restores `dsv41-sglang-optimized:0.2.8`.
+- **Content identity**: **`4cca364c46778423`** (3 layers) — a 14-member OCI layout
+  (9 blobs + `index.json` + `manifest.json` + `oci-layout` + 2 directory entries).
 
-> **Check the hashes, not the filename or the size.** The 0.2.8 pack differs from the
-> 0.2.4 pack by only 604,160 bytes (+0.0043%) — that is *not* enough to tell the two
-> versions apart by eye. The recorded offline audit of this exact file (md5, 9/9 blob
-> digests, layer chain, identity reproduction) is checked in under
+> **Check the hashes, not the filename or the size.** Adjacent versions are nearly
+> indistinguishable by size: 0.2.8 differs from 0.2.4 by only 604,160 bytes (+0.0043 %),
+> and 0.2.9 differs from 0.2.8 by +0.38 %. The recorded offline audit of the 0.2.8 file
+> (md5, 9/9 blob digests, layer chain, identity reproduction) is checked in under
 > [`data/release-artifact-20260923/`](data/release-artifact-20260923/).
 
 Verify before you load anything (no cluster, no docker daemon, no GPU needed):
@@ -483,14 +538,6 @@ python scripts/verify_release_artifact.py LuZ-0.2.8-dsv41-tp4-dgxspark.tar --md5
 # md5 MATCH · 9/9 blob sha256 verified · 0 unreferenced blobs
 # content identity 4cca364c46778423 · layer chain 3/3 decompress to their config diff_id
 # RESULT: PASS  (exit 0)
-```
-
-Then load on all four nodes (all of them need the image) and re-check identity locally:
-
-```bash
-docker load -i LuZ-0.2.8-dsv41-tp4-dgxspark.tar   # restores dsv41-sglang-optimized:0.2.8
-docker image inspect -f '{{join .RootFS.Layers " "}}' dsv41-sglang-optimized:0.2.8 \
-  | sha256sum | cut -c1-16      # expect: 4cca364c46778423
 ```
 
 That one-liner is the formula `start.sh`'s own preflight and boot banner use, so a passing
