@@ -79,6 +79,7 @@ Scanning discipline (learned the hard way, repeatedly)
 """
 import os
 import re
+import subprocess
 import sys
 
 # ---------------------------------------------------------------------------
@@ -112,6 +113,18 @@ import sys
 _SUDO_PW = "AS" + "1217" + "hf"
 _API_TOK = "sk-" + "dgxspark-" + "[0-9a-f]{4,}"
 _API_ALT = "LuZ" + "vLLM" + "DEV" + "2026"
+
+# 2026-10-01 carrier classes.  Same fragment discipline: the names below are
+# real identities found in the 0.2.9 bundle's *non-file* carriers, so they must
+# not appear contiguously anywhere in this file either.
+_ID_MAIL_1 = "op" + "s" + "@" + "local" + "host"
+_ID_MAIL_2 = "liux" + "iaoya" + "@" + "local"
+_ID_NAME_1 = "lixi" + "aofan"
+
+# Already published by THIS repository's own history (measured: 12 commits on
+# the pushed main line).  Fragment-built for the same reason as the rest: the
+# pattern list is inside the scan target.
+_ID_MAIL_PUB = "op" + "s" + "@" + "local" + "host"
 
 PATTERNS = [
     # (id, regex, class, severity)
@@ -183,6 +196,44 @@ PATTERNS = [
     ("ascii-placeholder",
      r"_PH_[A-Z0-9_]+_|<NODE_IP>|<PINNING>|<IB_HCA>|<NET_IFACE>|<USER>",
      "placeholder", "classified"),
+]
+
+# Carrier patterns: applied to commit/tag messages and to author / committer /
+# tagger identity fields, NOT to file contents.  Separate list on purpose -- a
+# worktree walk cannot see these carriers at all, so folding them into PATTERNS
+# would imply a coverage the walk does not have.
+CARRIER_PATTERNS = [
+    # The identities that are NOT already public -- and only those.  Two of the
+    # identities in the 0.2.9 bundle are already on this repository's own pushed
+    # main line (measured 2026-10-01), so they are disclosed-but-unfixable rather
+    # than new; they are handled by a separate `classified` pattern at the end of
+    # this list.  Splitting by DISPOSITION rather than listing every value here is
+    # load-bearing: if an already-published value stays in this alternation, both
+    # patterns fire and the blocker verdict wins, so the exemption becomes
+    # decoration.  That exact mistake was made and caught in one revision.
+    # Explain the shape, never the value -- this block is inside the scan target.
+    ("carrier-identity-email",
+     r"\b" + _ID_MAIL_2 + r"\b",
+     "identity", "blocker"),
+    # a real name with no email at all -- strictly more identifying than the
+    # local-part-only form, and the one identity class absent from the public
+    # repository's own history.
+    ("carrier-real-name", r"\b" + _ID_NAME_1 + r"\b", "identity", "blocker"),
+    # node hostnames are already a blocker class for file contents; they reach
+    # commit messages too (`--replace-text` does not touch messages).
+    ("carrier-node-hostname", r"\bdgxspark0[1-4]\b", "identity", "blocker"),
+
+    # Narrowly exempted, NOT harmless.  This one identity is already on the
+    # pushed public main line (12 commits, measured 2026-10-01), so the
+    # disclosure has already happened and rewriting it would change every SHA
+    # of a repository that is already cloned -- for a value that is already out.
+    # Severity `classified`, not `blocker`, and deliberately a SEPARATE pattern
+    # with its own id: collapsing it into the class above would exempt the two
+    # identities that are still private, which is the hole this class exists to
+    # close.  A class-wide exempt would be the bug, not the fix.
+    ("carrier-identity-already-published",
+     r"\b" + _ID_MAIL_PUB + r"\b",
+     "identity", "classified"),
 ]
 
 CLASSIFIED = {
@@ -310,7 +361,8 @@ def selftest():
     # the class; half two alone is what was already believed to be true.
     with open(os.path.abspath(__file__), "r", encoding="utf-8") as _self_f:
         _self_src = _self_f.read()
-    for _v in (_SUDO_PW, _API_TOK, _API_ALT):
+    for _v in (_SUDO_PW, _API_TOK, _API_ALT,
+               _ID_MAIL_1, _ID_MAIL_2, _ID_NAME_1, _ID_MAIL_PUB):
         if _v in _self_src:
             failures.append("this file PUBLISHES %r, which it exists to catch"
                             % (_v[:3] + "***"))
@@ -320,10 +372,48 @@ def selftest():
             failures.append("%s stopped matching a sample after being rebuilt "
                             "from fragments" % _pid)
 
+    # 2026-10-01 carrier classes.  Both halves again: each must catch a sample,
+    # and this file must not carry the value contiguously.  A carrier pattern
+    # that never fires proves nothing about the carriers it claims to cover.
+    _ck = dict((p[0], p[1]) for p in CARRIER_PATTERNS)
+    # counted so the printed total is the measured total; a report that
+    # understates its own coverage invites a reader to conclude the carriers
+    # were never checked.
+    _carrier_cases = 0
+    for _pid, _sample in (
+            ("carrier-identity-email", "commit by " + _ID_MAIL_2),
+            ("carrier-real-name",
+             "authored by " + _ID_NAME_1 + " on 09-12"),
+            ("carrier-node-hostname",
+             "wedge on dgxspark0" + "2" + " PD safety-mode"),
+            ("carrier-identity-already-published",
+             "authored by " + _ID_MAIL_PUB),
+            ("carrier-identity-already-published",
+             "committer " + _ID_MAIL_PUB + " on 09-21")):
+        _carrier_cases += 1
+        if not re.search(_ck[_pid], _sample, re.M):
+            failures.append("%s stopped matching a sample" % _pid)
+    for _t in ("Authored-by: LuZ Operator <operator@luz.invalid>",
+               "ops-worker@example.invalid",
+               "authorized <someone@example.invalid>",
+               "dgxspark0X is a placeholder",
+               # the already-published identity must NOT be a blocker: it is a
+               # `classified` hit in its own pattern, and a value with two
+               # dispositions would silently take the stricter one.
+               "author " + _ID_MAIL_PUB + " end"):
+        _carrier_cases += 1
+        for _pid, _rx, _cls, _sev in CARRIER_PATTERNS:
+            if _sev != "blocker":
+                continue
+            if re.search(_rx, _t, re.M):
+                failures.append("false positive: %s matched %r"
+                                % (_pid, _t))
+
     for f in failures:
         print("  [FAIL] " + f)
     print("selftest: %d cases, %d failures"
-          % (len(SELFTEST_NO_MATCH) + len(SELFTEST_MUST_MATCH), len(failures)))
+          % (len(SELFTEST_NO_MATCH) + len(SELFTEST_MUST_MATCH)
+             + _carrier_cases, len(failures)))
     return 1 if failures else 0
 
 
@@ -358,6 +448,65 @@ def scan(root):
     return hits
 
 
+def _git(repo, args):
+    p = subprocess.run(["git"] + args, cwd=repo, capture_output=True)
+    return p.returncode, p.stdout.decode("utf-8", "replace")
+
+
+def scan_carriers(repo):
+    """Scan the carriers a worktree walk cannot reach.
+
+    commit messages / author+committer identity / annotated tag objects
+    (tagger identity + message).  Returns a hit list in the same shape as
+    scan(), or None when `repo` is not a git repository -- the caller must
+    then say so out loud instead of reporting a clean result.
+    """
+    rc, _ = _git(repo, ["rev-parse", "--git-dir"])
+    if rc != 0:
+        return None
+    hits = []
+
+    def check(where, lineno, text):
+        for pid, rx, cls, sev in CARRIER_PATTERNS:
+            if re.search(rx, text, re.M):
+                hits.append((pid, cls, sev, where, lineno,
+                             text.strip()[:150]))
+
+    rc, out = _git(repo, ["log", "--all",
+                          "--format=%H%x1f%an%x1f%ae%x1f%cn%x1f%ce%x1f%B%x1e"])
+    if rc == 0:
+        for rec in out.split("\x1e"):
+            rec = rec.strip("\n")
+            if not rec.strip():
+                continue
+            f = rec.split("\x1f")
+            if len(f) < 6:
+                continue
+            sha = f[0].strip()[:12]
+            for kind, val in (("author-name", f[1]), ("author-email", f[2]),
+                              ("committer-name", f[3]), ("committer-email", f[4])):
+                check("commit:%s/%s" % (sha, kind), 0, val)
+            for i, line in enumerate(f[5].split(chr(10)), 1):
+                check("commit:%s/message" % sha, i, line)
+
+    rc, out = _git(repo, ["for-each-ref", "refs/tags",
+                          "--format=%(refname)%09%(objecttype)%09%(taggername)"
+                          "%09%(taggeremail)%09%(contents)"])
+    if rc == 0:
+        for line in out.split(chr(10)):
+            if not line.strip():
+                continue
+            f = line.split("\t")
+            if len(f) < 5 or f[1] != "tag":
+                continue
+            ref = f[0].replace("refs/tags/", "")
+            for kind, val in (("tag-name", f[2]), ("tag-email", f[3])):
+                check("tag:%s/%s" % (ref, kind), 0, val)
+            for i, ln in enumerate(f[4].split(chr(10)), 1):
+                check("tag:%s/message" % ref, i, ln)
+    return hits
+
+
 def main(argv):
     if "--selftest" in argv:
         return selftest()
@@ -370,8 +519,22 @@ def main(argv):
         return 2
 
     hits = scan(root)
+    carrier_hits = scan_carriers(root)
+    if carrier_hits is None:
+        carrier_hits = []
+        carriers_note = (
+            "NOT SCANNED -- %s is not a git repository, so the commit/tag\n"
+            "            messages and author/committer/tagger identities were\n"
+            "            not checked.  A worktree walk cannot see them: this is\n"
+            "            a gap, not a clean result." % root)
+    else:
+        carriers_note = (
+            "scanned -- commit messages, annotated-tag messages (tagger\n"
+            "            identity included) and author/committer identities.\n"
+            "            A worktree walk cannot see any of these.")
+
     counts, unclassified = {}, []
-    for pid, cls, sev, rel, lineno, text in hits:
+    for pid, cls, sev, rel, lineno, text in hits + carrier_hits:
         counts[(cls, sev)] = counts.get((cls, sev), 0) + 1
         if sev == "classified" or (pid, rel) in CLASSIFIED or (pid, "*") in CLASSIFIED:
             continue
@@ -379,6 +542,7 @@ def main(argv):
 
     print("scan root : %s" % root)
     print("hits      : %d across %d files" % (len(hits), len(set(h[3] for h in hits))))
+    print("carriers  : %d hits, %s" % (len(carrier_hits), carriers_note))
     for (cls, sev), n in sorted(counts.items()):
         print("  %-11s %-19s %d" % (sev, cls, n))
 
