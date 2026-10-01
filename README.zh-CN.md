@@ -410,7 +410,15 @@ b12x 是消费级 Blackwell（SM120/SM121）的 CuTe-DSL 内核库：NVFP4/MXFP4
   `dsv41-sglang-optimized:0.2.9-ep1q2-fin2`
 
 该文件的离线审计与身份数据落档在
-[`data/release-artifact-20260930/`](data/release-artifact-20260930/)。
+[`data/release-artifact-20260930/`](data/release-artifact-20260930/)——含校验器的控制台
+记录、机器可读 JSON、16 条成员的 blob 清单、以及独立的层链日志，使你可以**不下载
+13 GiB** 就复核下面每一个数字。同一条命令即可复现：
+
+```bash
+python scripts/verify_release_artifact.py LuZ-0.2.9-dsv41-tp4-dgxspark.tar \
+  --md5 --expect-md5 3562a789ec0e9aa4bc80a7e54ba1be65 \
+  --expect-identity 355a5e45cb2725ae --layer-chain
+```
 
 **四机分发校验**（部署之后、信任任何基准数字之前先跑；随本次发布分发 —— 见
 [`scripts/verify_fleet_distribution.sh`](scripts/verify_fleet_distribution.sh)）：
@@ -503,6 +511,31 @@ share | mount | sync | serve | stop | status | logs | smoke | ncclcheck | gate`�
   `.env.tp4.example` 里写的三步做
 - 权重本身 —— `MODEL_DIR` / `WORKER_MODEL_DIR*` 指向 `$HOME/NewModels/…`，
   checkpoint 不随本仓分发
+
+### 前置条件 —— 本仓**不给**你什么
+
+本仓是**配方＋运维层**，不是开箱即用的整机方案。下表是部署者必须自备、且**不在 tar 里**的东西。
+每一行都对着包内实际内容核过；写着「不随仓分发」的，就不要去找了。
+
+| 需要什么 | 状态 |
+|---|---|
+| **4× NVIDIA DGX Spark（GB10，SM121）** | 硬件 |
+| **四机之间的无交换机 RoCE 环网**（ConnectX-7；启动脚本假定 4 节点＝1 head + 3 worker） | 硬件 |
+| **每节点 ~121.63 GiB 统一内存**（Grace–Blackwell UMA——**主存即显存**） | 硬件 |
+| **NVIDIA 驱动 `580.173.02` + CUDA 13.0** | 主机侧，**不随仓分发**——内核绑定这一对（见 §4） |
+| **Ring-only NCCL 2.30.7**（`/opt/nccl-ringonly/libnccl.so.2.30.7`，LuZ 血统）+ `libncclpin` shim | 主机侧，**不随仓分发**；该血统工程**未声明许可**（见 [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) §2） |
+| **模型权重** `deepseek-ai/DeepSeek-V4.1-Flash` | 另行获取；**不随仓分发** |
+| **镜像磁盘空间**：tar 13.09 GiB ＋ 解包约 40 GiB，**四台每台都要** | 容量提示 |
+| **4 个站点键**（`HEAD_IP`、`WORKER_IPS`、`WORKER_HOSTS`、`WORKER_USER`） | 由你填进 `.env.tp4` |
+| **`PEER_HCA_RANK*` 布线表** | 可推导——三步写法在 `.env.tp4.example` 里；用 `./start-tp4.sh ncclcheck` 验证 |
+| **看护／自愈进程** | **不随仓分发。** 仓内那份 monitor 副本是 `[RETIRED-20260920]`、从未接线，**连 `bash -n` 都过不了**；生产单元是本站对象。见 [`docs/4DGX-DSV41-Flash-部署方案-20260911.md`](docs/4DGX-DSV41-Flash-部署方案-20260911.md) Phase 3 |
+| **网关／并发代理** | `gateway/` 是**源码**不是服务——跑它的 unit 由你提供 |
+| **模型自身的 checkpoint 布局**（镜像内 `/models/DeepSeek-V4.1-Flash`） | 见 [`BUILD-IDENTITY.md`](BUILD-IDENTITY.md) |
+
+> **在相信任何数字之前。** 先把镜像载入，然后跑
+> `./scripts/verify_fleet_distribution.sh`（§7）。否则两台**都缺该镜像**的机器会互相「一致」——
+> 因为对**不存在的镜像**跑 `docker image inspect … | sha256sum` 返回的是一个看着很像样的常量，
+> 而不是失败。
 
 ---
 

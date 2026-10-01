@@ -3,17 +3,48 @@
 Use this to tell whether *your* build is the same one the `[measured]` numbers in
 `.env.tp4.example`, the READMEs and `docs/03-final-metrics/` came from.
 
-**Current production: `dsv41-sglang-optimized:0.2.8` — content identity
-`4cca364c46778423` (3 layers).** The download in [README §7](README.md#7-image-download-release-artifact)
+**Current release: `dsv41-sglang-optimized:0.2.9-ep1q2-fin2` — content identity
+`355a5e45cb2725ae` (5 layers).** The download in [README §7](README.md#7-image-download-release-artifact)
 is the same content; its identity is re-derivable from the archive alone.
+
+**Previous release: `dsv41-sglang-optimized:0.2.8` — content identity
+`4cca364c46778423` (3 layers).** Kept because its 50-cell PR matrix is the matrix of
+record *for that base*; see [README §1](README.md#1-what-is-running-right-now). The two
+bases are **not comparable** — do not normalize one table into the other.
+
+> ⚠️ **What this file does and does not have for 0.2.9.** The 0.2.9 pack records a
+> narrower set of build anchors than the 0.2.8 pack did (it ships `identity/IMAGE-IDENTITY.txt`,
+> the adapter manifest and the archive sha256, not a full `docker inspect` dump). The
+> 0.2.9 rows below are therefore the **recorded** subset, and the fields that were never
+> captured are marked `— not recorded in the 0.2.9 pack` rather than filled with a
+> plausible-looking value. Re-derive them from your own image if you need them:
+> `docker image inspect` against a loaded 0.2.9 — and compare the **content identity**
+> first, because that is the acceptance value and it is recorded.
 
 ---
 
 ## Images
 
+### 0.2.9 — current release
+
 | | value |
 |---|---|
-| Production tag | **`dsv41-sglang-optimized:0.2.8`** |
+| Tag | **`dsv41-sglang-optimized:0.2.9-ep1q2-fin2`** |
+| **Content identity — the acceptance value** | **`355a5e45cb2725ae`** = `sha256(join RootFS.Layers " ")` first 16 hex |
+| RootFS layer count | **5** |
+| Archive sha256 (`.tar`) | `c1840255408f8b8b012279153580d1310f5d7d9bc4f5aa4e4181bcc8bf23fb0d` |
+| Archive md5 (`.tar`) | `3562a789ec0e9aa4bc80a7e54ba1be65` |
+| Archive size | `14,055,778,304` bytes (13.09 GiB) |
+| `base_cid` (recorded ancestor) | `fa825cd26bd2c1a6` |
+| Banner gates / preflight | `16` / `v1-fin2` |
+| Adapter payload digests | [`identity/ADAPTER-MANIFEST.txt`](data/release-artifact-20260930/ADAPTER-MANIFEST.txt) — 29 files, per-file md5 |
+| SGLang commit, `built_at`, `overlay_files`, `overlay_map_md5`, `kit_manifest_md5`, `.Created`, full 64-hex identity | — not recorded in the 0.2.9 pack |
+
+### 0.2.8 — previous release (matrix of record for its own base)
+
+| | value |
+|---|---|
+| Tag | **`dsv41-sglang-optimized:0.2.8`** |
 | **Content identity — the acceptance value** | **`4cca364c46778423`** = `sha256(join RootFS.Layers " ")` first 16 hex (identical on all four nodes) |
 | Content identity, full | `4cca364c4677842338e65014b5c34cb353692d2cfa69bfd139f4eee086a13db2` |
 | RootFS layer count | **3** (identical on all four nodes) |

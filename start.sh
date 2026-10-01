@@ -182,7 +182,7 @@ BASE_IMAGE="${BASE_IMAGE:-lmsysorg/sglang:dev-dsv41}"
 # 2026-09-23 修：旧默认长期滞后（0.2.4 → 0.2.7 递进；0.2.4 为 125 层、落后三代），
 # 于是任何「忘了带 ENV_FILE」的起栈会静默拿到旧世代镜像 —— 而两处判据查的都是
 # .env.tp4，默认值不在任何判据覆盖内，所以这种不一致**没有任何告警面**。
-IMAGE="${IMAGE:-dsv41-sglang-optimized:0.2.8}"
+IMAGE="${IMAGE:-dsv41-sglang-optimized:0.2.9-ep1q2-fin2}"
 HEAD_CTN="${HEAD_CTN:-dsv41-head}"
 WORKER_CTN="${WORKER_CTN:-dsv41-worker}"
 WORKER_DIR="${WORKER_DIR:-/home/${WORKER_USER}/dsv41-flash-dgxsparks}"

@@ -485,7 +485,16 @@ via cloud drive (two mirrors):
   `dsv41-sglang-optimized:0.2.9-ep1q2-fin2`.
 
 Recorded offline audit and identity data for this file:
-[`data/release-artifact-20260930/`](data/release-artifact-20260930/).
+[`data/release-artifact-20260930/`](data/release-artifact-20260930/) — the verifier's
+console transcript, its machine-readable JSON, the 16-member blob manifest, and the
+standalone layer-chain log, so you can check every number below without downloading
+13 GiB. The same one-liner reproduces it:
+
+```bash
+python scripts/verify_release_artifact.py LuZ-0.2.9-dsv41-tp4-dgxspark.tar \
+  --md5 --expect-md5 3562a789ec0e9aa4bc80a7e54ba1be65 \
+  --expect-identity 355a5e45cb2725ae --layer-chain
+```
 
 **Fleet-wide distribution check** (run after deploying, before you trust a benchmark
 number; shipped with this release — see
@@ -578,6 +587,32 @@ Two things no template can hand you:
   (§8) or from the three steps written inside `.env.tp4.example`
 - the weights — `MODEL_DIR` / `WORKER_MODEL_DIR*` point at `$HOME/NewModels/…`,
   and the checkpoint is not distributed with this repository
+
+### Prerequisites — what this repository does *not* give you
+
+The repo is a **recipe and an operations layer**, not a turnkey appliance. The list below
+is what a deployer must supply that is **not in the tarball**. Every item is checked
+against what is actually in the pack; if a row says "not shipped", do not go looking.
+
+| Requirement | Status |
+|---|---|
+| **4× NVIDIA DGX Spark (GB10, SM121)** | hardware |
+| **Switchless RoCE ring between them** (ConnectX-7; the launchers assume 4 nodes = 1 head + 3 workers) | hardware |
+| **~121.63 GiB unified memory per node** (Grace–Blackwell UMA — host RAM *is* device memory) | hardware |
+| **NVIDIA driver `580.173.02` + CUDA 13.0** | host, **not shipped** — the kernels bind to this pair (see §4) |
+| **Ring-only NCCL 2.30.7** (`/opt/nccl-ringonly/libnccl.so.2.30.7`, LuZ lineage) + `libncclpin` shim | host, **not shipped**; that lineage project declares **no licence** (see [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) §2) |
+| **Model weights** `deepseek-ai/DeepSeek-V4.1-Flash` | obtained separately; **not shipped** |
+| **Free disk for the image**: 13.09 GiB tar + ~40 GiB unpacked, **on each of the four nodes** | sizing note |
+| **The 4 site keys** (`HEAD_IP`, `WORKER_IPS`, `WORKER_HOSTS`, `WORKER_USER`) | yours to fill in `.env.tp4` |
+| **The `PEER_HCA_RANK*` wiring map** | derivable — three steps are written in `.env.tp4.example`; verify with `./start-tp4.sh ncclcheck` |
+| **A watchdog / self-heal process** | **not shipped.** The published copy of the monitor is `[RETIRED-20260920]`, never wired, and does not even pass `bash -n`; the production unit is a site object. See [`docs/4DGX-DSV41-Flash-部署方案-20260911.md`](docs/4DGX-DSV41-Flash-部署方案-20260911.md) Phase 3 |
+| **A gateway / concurrency proxy** | the `gateway/` tree is source, not a service — you provide the unit that runs it |
+| **The model's own checkpoint layout** (`/models/DeepSeek-V4.1-Flash` in-image path) | see [`BUILD-IDENTITY.md`](BUILD-IDENTITY.md) |
+
+> **Before you trust a number.** Load the image, then run
+> `./scripts/verify_fleet_distribution.sh` (§7). Two nodes both *missing* the image will
+> otherwise agree with each other, because `docker image inspect … | sha256sum` on an
+> absent image returns a plausible constant rather than failing.
 
 ---
 
