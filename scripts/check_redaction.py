@@ -67,6 +67,15 @@ Scanning discipline (learned the hard way, repeatedly)
   its self-test case in the same edit -- the fixtures below are the regression.
 - `zurih`, `?pwd=luzi` and `/opt/aicad-prod` are deliberate and load-bearing
   (attribution, published share code, published project name).  Do not "clean" them.
+- **2026-09-30, and the same rule applied to a *sibling key*.**  `peer-hca-pinning-map`
+  had long been the one class the repo masks rather than classifies, on the stated
+  ground that the map *is* the physical cabling.  Then the 0.2.9 pack turned out to
+  carry `B12X_ROCE_PEER_HCA_MAPS` -- the same map written as `peer=HCAindex/HCAindex`,
+  with `B12X_ROCE_HCA` giving the index order.  Decoding it against the four shipped
+  `PEER_HCA_RANK<n>` values reproduced every one of the 12 masked entries (and 4 more).
+  So the masking was cosmetic: the class was masked in one spelling and published in
+  another.  Class `b12x-peer-hca-map` was added.  The lesson is the general form of
+  the one above: **a class is not a value, it is every encoding of that value.**
 """
 import os
 import re
@@ -122,6 +131,18 @@ PATTERNS = [
      "network", "blocker"),
 
     ("peer-hca-pinning-map", r"PEER_HCA_RANK[0-9]\s*=\s*\"[^\"]*roce",
+     "topology-fingerprint", "blocker"),
+
+    # Added 2026-09-30.  The class above is *one encoding* of the pinning map, and
+    # masking it alone turned out to be cosmetic: `B12X_ROCE_PEER_HCA_MAPS` carries
+    # the same map as peer=HCAindex/HCAindex, and `B12X_ROCE_HCA` supplies the index
+    # order, so every masked `PEER_HCA_RANK<n>` entry is recoverable from the two
+    # keys nobody was looking at.  Measured, not inferred: all 12 masked entries
+    # decode back byte-for-byte (and the B12X form carries 4 more).  A mask whose
+    # target is still readable through a sibling key is not a mask.
+    #
+    # Shape, not value: `p=a/b` with `/` and `,` separators inside one assignment.
+    ("b12x-peer-hca-map", r"B12X_ROCE_PEER_HCA_MAPS\s*=\s*\"?[0-9]+=[0-9]+/[0-9]+",
      "topology-fingerprint", "blocker"),
 
     # Added 2026-09-24 (see the docstring).  Two design notes:
@@ -230,10 +251,17 @@ SELFTEST_NO_MATCH = [
     # generic Windows accounts carry no identity either (same argument as /home/user)
     _WIN_OK,
     "default profile lives under C:" + "/Us" + "ers/" + "Public",
+    # 2026-09-30: naming the B12X key in prose (a doc that explains the derivation)
+    # is not the map. Only a value assignment is.
+    "`B12X_ROCE_PEER_HCA_MAPS` is the index form of the pinning map; see `B12X_ROCE_HCA`",
 ]
 SELFTEST_MUST_MATCH = [
     ("peer-hca-pinning-map",
      "PEER_HCA_RANK0=" + '"1=' + _HCA + ";3=hcaC,hcaD\""),
+    # 2026-09-30: the sibling encoding. Shape-only fixture -- the pattern keys on the
+    # `p=a/b` structure, so no real value has to be written down to test it.
+    ("b12x-peer-hca-map", "B12X_ROCE_PEER_HCA_MAPS=" + "1=1/3,2=0/3"),
+    ("b12x-peer-hca-map", 'B12X_ROCE_PEER_HCA_MAPS="' + "0=1/2;1=0/2"),
     ("hca-name", "IB_HCA=" + _HCA),
     ("nic-name", "GLOO_SOCKET_IFNAME=" + _NIC),
     ("username-in-path", "SB=" + "/home/" + "some" + "one/state"),
