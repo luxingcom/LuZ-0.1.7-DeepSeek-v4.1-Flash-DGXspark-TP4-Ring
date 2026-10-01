@@ -1,0 +1,40 @@
+{
+  "archive": "LuZ-0.2.9-dsv41-tp4-dgxspark.tar",
+  "bytes": 14055778304,
+  "compression": "none",
+  "expected": "355a5e45cb2725ae",
+  "md5": "3562a789ec0e9aa4bc80a7e54ba1be65",
+  "md5_ok": true,
+  "tar_members": 16,
+  "blob_members": 11,
+  "blob_hash_failures": [],
+  "dag": [
+    {
+      "kind": "image",
+      "manifest": "blobs/sha256/e15d95c7cd893aa534f32f9a649a23dbb221bdf995b588732b18deb25e2460be",
+      "config": "blobs/sha256/c575f041fec2ec98860dce3d9bd70bccbe3c8b3c57598638c90d95bb6ed92641",
+      "layers": 5,
+      "distinct": 5
+    },
+    {
+      "kind": "attestation",
+      "manifest": "blobs/sha256/cbe4d600c29de5bbc9b4898c886ceaf9ca9f83c616c6fc9b81477969ca2c7fb8",
+      "config": "blobs/sha256/8344f7954bf0d600669f140a47bce3e4a492993986ec5405e7621e81d2c9cfb7",
+      "layers": 1,
+      "distinct": 1
+    }
+  ],
+  "unreferenced_blobs": [],
+  "content_identity": "355a5e45cb2725ae",
+  "content_identity_full": "355a5e45cb2725aeb326c2de25e45d21cfc6c3587d086c5ca3bc39d73a8cbad8",
+  "serializations": {
+    "space-joined + trailing newline  [AUTHORITATIVE: docker image inspect -f '{{join .RootFS.Layers \" \"}}' | sha256sum]": "355a5e45cb2725ae",
+    "space-joined, no trailing newline": "70723e2f531e5b02",
+    "newline-joined, no trailing newline": "de80c178d3f2c9e3",
+    "newline-joined + trailing newline": "f571d79e0f3da87c",
+    "newline-joined + two trailing newlines": "2c52798b9aa3e5ea"
+  },
+  "config_digest": "c575f041fec2ec98860dce3d9bd70bccbe3c8b3c57598638c90d95bb6ed92641",
+  "oci_index_digest": "f51d0f2ac9b47adfe4e1052682624ecd7b9ef7dbe20ebf98c4c01b1380f43b8f",
+  "layer_chain_ok": true
+}

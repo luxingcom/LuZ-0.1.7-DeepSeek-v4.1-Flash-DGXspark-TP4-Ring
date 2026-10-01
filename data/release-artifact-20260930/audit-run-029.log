@@ -1,0 +1,61 @@
+==========================================================================
+FILE
+==========================================================================
+  path              : releases/LuZ-0.2.9-dsv41-tp4-dgxspark.tar
+  bytes             : 14,055,778,304
+  compression       : none  (no profile)
+  md5               : 3562a789ec0e9aa4bc80a7e54ba1be65   (MATCH, 17.6s)
+
+==========================================================================
+1. INTEGRITY  (single streaming pass, 23.6s)
+==========================================================================
+  tar members       : 16
+  blob members      : 11
+  payload bytes     : 14,055,764,167
+  blob hash failures: 0
+  => every blob member's sha256 equals its own filename
+     the archive is a self-consistent store; nothing truncated
+
+==========================================================================
+2. REFERENCE GRAPH
+==========================================================================
+  index.json         : OCI index, 1 descriptor(s) -> index blob f51d0f2ac9b47adf
+    image       manifest e15d95c7cd893aa5  layers=5    distinct=5    config=c575f041fec2ec98
+    attestation manifest cbe4d600c29de5bb  layers=1    distinct=1    config=8344f7954bf0d600
+  blob members referenced by the DAG : 11 / 11
+  unreferenced                       : 0 []
+
+==========================================================================
+3. CONTENT IDENTITY
+==========================================================================
+  image config blob  : c575f041fec2ec98 (6677 bytes, sha256 self-consistent)
+  RepoTags           : ['dsv41-sglang-optimized:0.2.9-ep1q2-fin2']
+  created            : 2026-09-28T23:46:58.804626314Z
+  diffIDs            : 5 entries, 5 distinct
+
+  every published "identity" for this build, against the SAME 5-entry list:
+  serialization                                                                                        sha256[:16]
+  space-joined + trailing newline  [AUTHORITATIVE: docker image inspect -f '{{join .RootFS.Layers " "}}' | sha256sum] 355a5e45cb2725ae  <== ACCEPTED (== start.sh IMGID_TPL)
+  space-joined, no trailing newline                                                                    70723e2f531e5b02
+  newline-joined, no trailing newline                                                                  de80c178d3f2c9e3
+  newline-joined + trailing newline                                                                    f571d79e0f3da87c
+  newline-joined + two trailing newlines                                                               2c52798b9aa3e5ea
+
+  content identity   : 355a5e45cb2725ae
+  content identity, full : 355a5e45cb2725aeb326c2de25e45d21cfc6c3587d086c5ca3bc39d73a8cbad8
+  expected           : 355a5e45cb2725ae
+
+==========================================================================
+4. LAYER CHAIN  (second streaming pass: gunzip every layer blob)
+==========================================================================
+  557f4bef382be5b0  decompressed          10240 B  MATCH  (== diff_id fafdbd020213db47)
+  650868da37a53979  decompressed          45568 B  MATCH  (== diff_id fe0ac47b317d42ac)
+  95d084457386372a  decompressed    32795040256 B  MATCH  (== diff_id 21e24016b1852124)
+  a06fc2124c4dc062  decompressed          19968 B  MATCH  (== diff_id e9e10413c6fbad61)
+  bdba1fbd5137e0d4  decompressed         238080 B  MATCH  (== diff_id 9ab3e97fb9991b55)
+  => every layer blob decompresses to exactly its config diff_id
+
+  RESULT: PASS -- this archive is the same content the fleet runs.
+
+wrote data/release-artifact-20260930/release-audit-029.json
+wrote data/release-artifact-20260930/blob-manifest.txt
