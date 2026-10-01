@@ -15,7 +15,7 @@
 | Triton | 上游开源 | Apache-2.0 | attn/dequant/engram_hash/fast_argmax |
 | SGLang JIT（nvcc sm_121a + ninja + tvm_ffi，独立第四条编译链） | 上游开源 | Apache-2.0 | c1/c2/store/main_norm_rope/topk 等 19 变体 |
 | **b12x 1.3.0** | PyPI 公开包（github.com/local-inference-lab/b12x） | **Apache-2.0（非闭源）** | ⚠自述"不面向生产/数据中心"= 合规唯一注意点；本仓 wheel 解包 + 2 个自研回移补丁 |
-| **NCCL ring-only 2.30.7 + libncclpin.so** | LuZ 系（luxingcom/aicad-nccl-optimization） | **⚠无许可证声明** | 全清单唯一真正无许可外部二进制 |
+| **NCCL ring-only 2.30.7 + libncclpin.so** | LuZ 系（luxingcom/aicad-nccl-optimization） | **Apache-2.0**（2026-09-20 起；本行 2026-09-19 首记时该仓确无 LICENSE，次日 `894719d` 补齐 ⇒ "无许可证"自 2026-09-20 起已过期） | 原判「唯一无许可外部二进制」**已不成立**——该仓有 Apache-2.0，本仓不再存在无许可的宿主侧外部件 |
 | NCCL 上游 | NVIDIA | BSD | ring-only 构建的源头 |
 | 自研 adapter（8 文件）+ overlay（45 条） | 本仓 | 随仓 | 见 §2/§3 |
 

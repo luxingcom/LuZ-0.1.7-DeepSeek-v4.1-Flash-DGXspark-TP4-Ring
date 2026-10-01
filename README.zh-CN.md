@@ -524,7 +524,8 @@ share | mount | sync | serve | stop | status | logs | smoke | ncclcheck | gate`�
 | **每节点 ~121.63 GiB 统一内存**（Grace–Blackwell UMA——**主存即显存**） | 硬件 |
 | **NVIDIA 驱动 `580.173.02` + CUDA 13.0** | 主机侧，**不随仓分发**——内核绑定这一对（见 §4） |
 | **Ring-only NCCL 2.30.7**（`/opt/nccl-ringonly/libnccl.so.2.30.7`，LuZ 血统）+ `libncclpin` shim | 主机侧，**不随仓分发**；该血统工程**未声明许可**（见 [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) §2） |
-| **模型权重** `deepseek-ai/DeepSeek-V4.1-Flash` | 另行获取；**不随仓分发** |
+| **模型权重** `deepseek-ai/DeepSeek-V4.1-Flash` | **不随仓分发**，但**可下载**：`./start.sh download` 会执行 `hf download deepseek-ai/DeepSeek-V4.1-Flash --revision fb2764a5cf321eaa5070ca8f9e892818f477c16d`（`start.sh` 与 `boot.py` 同持的固定 revision）到 `MODEL_DIR`，并软链到 `/var/tmp/DeepSeek-V4.1-Flash`。需 `hf` CLI：`pip install -U huggingface_hub[cli]`。若 `config.json` 与 ≥`EXPECTED_SHARDS`(=48) 个 `model-*-of-*.safetensors` 已就位则**跳过** |
+| **启动器断言的分片布局** | `-0731` MXFP4 checkpoint 为 48 分片（`model-000NN-of-00048.safetensors`）；`EXPECTED_SHARDS` 是下载器与启动检查共用的断言值。Hub 上 `main` 若已重新分片会触发该断言 |
 | **镜像磁盘空间**：tar 13.09 GiB ＋ 解包约 40 GiB，**四台每台都要** | 容量提示 |
 | **4 个站点键**（`HEAD_IP`、`WORKER_IPS`、`WORKER_HOSTS`、`WORKER_USER`） | 由你填进 `.env.tp4` |
 | **`PEER_HCA_RANK*` 布线表** | 可推导——三步写法在 `.env.tp4.example` 里；用 `./start-tp4.sh ncclcheck` 验证 |
@@ -563,7 +564,7 @@ fail-closed 运行。
 |---|---|---|
 | SGLang 配方（boot、适配器、Engram 行存储、DSpark 设置） | [`ntxf31415/DeepSeek-v4.1-Flash-DGX-Sparks`](https://github.com/ntxf31415/DeepSeek-v4.1-Flash-DGX-Sparks)（亦以 `MiaAI-Lab/DeepSeek-v4.1-Flash-DGX-Sparks` 发布） | AGPL-3.0-or-later |
 | 配方谱系 / 基准方法 | [`0xSero/deepseek-v4.1-flash-4x-rtx-pro-6000`](https://github.com/0xSero/deepseek-v4.1-flash-4x-rtx-pro-6000) | MIT |
-| 宿主 ring-only NCCL 2.30.7 构建 + `libncclpin` 核绑定 shim（宿主侧，仓库不含） | [`luxingcom/aicad-nccl-optimization`](https://github.com/luxingcom/aicad-nccl-optimization)（LuZ 谱系） | **未声明许可证** |
+| 宿主 ring-only NCCL 2.30.7 构建 + `libncclpin` 核绑定 shim（宿主侧，仓库不含） | [`luxingcom/aicad-nccl-optimization`](https://github.com/luxingcom/aicad-nccl-optimization)（LuZ 谱系） | **Apache-2.0**（该仓 `LICENSE`，2026-09-20 经 `894719d` 加入） |
 | 模型权重 | `deepseek-ai/DeepSeek-V4.1-Flash`（Hugging Face） | 见模型卡 |
 
 **姊妹项目：** [DeepSeek-V4-Flash-Vision-Exp TP4 无交换机环网](https://github.com/ntxf31415/deepseek-v4-vision-exp-dgxspark-tp4-switchless-ring)（vLLM，同一环网底座）· [GLM-5.3-Flash NVFP4 TP4 无交换机环网](https://github.com/ntxf31415/glm-5.3-flash-nvfp4-4x-dgx-spark-switchless)（同底座配方）。

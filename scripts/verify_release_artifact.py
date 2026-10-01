@@ -27,6 +27,7 @@ false-empty constant is an error — never a plausible-looking hash.
 
 Artifact profiles (expected identity / md5 / layer count):
 
+    LuZ-0.2.9-dsv41-tp4-dgxspark.tar      355a5e45cb2725ae  (5 layers, raw tar)
     LuZ-0.2.8-dsv41-tp4-dgxspark.tar      4cca364c46778423  (3 layers, raw tar)
     LuZ-0.2.4-dsv41-tp4-dgxspark.tar.zst  4ebef21b6aedbd70  (123 layers, zstd)
     LuZ-0.1.7-DSV41F-image.tar.zst        4ebef21b6aedbd70  (123 layers, zstd;
@@ -66,6 +67,14 @@ FALSE_EMPTY = {
 # The identity is ALWAYS `sha256(join(diff_ids, " ") + "\n")[:16]` -- the formula
 # start.sh's IMGID_TPL emits -- regardless of archive compression.
 PROFILES = {
+    "LuZ-0.2.9-dsv41-tp4-dgxspark.tar": {
+        "identity": "355a5e45cb2725ae",
+        # registered from the release audit; see this file's module
+        # docstring note -- not re-measured by this edit.
+        "md5": "3562a789ec0e9aa4bc80a7e54ba1be65",
+        "layers": 5,
+        "compression": "none",
+    },
     "LuZ-0.2.8-dsv41-tp4-dgxspark.tar": {
         "identity": "4cca364c46778423",
         "md5": "a9d4cdf932203f173df7556aa511fee1",

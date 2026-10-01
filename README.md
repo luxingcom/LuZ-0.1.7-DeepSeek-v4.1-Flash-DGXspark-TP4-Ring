@@ -586,7 +586,9 @@ Two things no template can hand you:
 - the `PEER_HCA_RANK*` wiring map — derive it from a `NCCL_DEBUG=INFO` first boot
   (§8) or from the three steps written inside `.env.tp4.example`
 - the weights — `MODEL_DIR` / `WORKER_MODEL_DIR*` point at `$HOME/NewModels/…`,
-  and the checkpoint is not distributed with this repository
+  and the checkpoint is not distributed with this repository. **Do not just pull
+  `main` from the Hub**: the launcher pins an exact revision, and `start.sh`
+  already knows how to fetch it — see the weights rows in the table below
 
 ### Prerequisites — what this repository does *not* give you
 
@@ -600,12 +602,13 @@ against what is actually in the pack; if a row says "not shipped", do not go loo
 | **Switchless RoCE ring between them** (ConnectX-7; the launchers assume 4 nodes = 1 head + 3 workers) | hardware |
 | **~121.63 GiB unified memory per node** (Grace–Blackwell UMA — host RAM *is* device memory) | hardware |
 | **NVIDIA driver `580.173.02` + CUDA 13.0** | host, **not shipped** — the kernels bind to this pair (see §4) |
-| **Ring-only NCCL 2.30.7** (`/opt/nccl-ringonly/libnccl.so.2.30.7`, LuZ lineage) + `libncclpin` shim | host, **not shipped**; that lineage project declares **no licence** (see [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) §2) |
-| **Model weights** `deepseek-ai/DeepSeek-V4.1-Flash` | obtained separately; **not shipped** |
+| **Ring-only NCCL 2.30.7** (`/opt/nccl-ringonly/libnccl.so.2.30.7`, LuZ lineage) + `libncclpin` shim | host, **not shipped**; the lineage project is **Apache-2.0** (see [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) §2) |
+| **Model weights** `deepseek-ai/DeepSeek-V4.1-Flash` | **not shipped**, but *fetchable*: `./start.sh download` runs `hf download deepseek-ai/DeepSeek-V4.1-Flash --revision fb2764a5cf321eaa5070ca8f9e892818f477c16d` (the revision `start.sh` and `boot.py` both pin) into `MODEL_DIR` and symlinks it to `/var/tmp/DeepSeek-V4.1-Flash`. Needs the `hf` CLI — `pip install -U huggingface_hub[cli]`. It **skips** when `config.json` plus ≥`EXPECTED_SHARDS` (=48) `model-*-of-*.safetensors` are already present |
+| **The 48-shard checkpoint layout** the launcher asserts | the `-0731` MXFP4 checkpoint is 48 shards (`model-000NN-of-00048.safetensors`); `EXPECTED_SHARDS` is the count both the downloader and the boot check use. A Hub `main` that has been re-sharded trips it |
 | **Free disk for the image**: 13.09 GiB tar + ~40 GiB unpacked, **on each of the four nodes** | sizing note |
 | **The 4 site keys** (`HEAD_IP`, `WORKER_IPS`, `WORKER_HOSTS`, `WORKER_USER`) | yours to fill in `.env.tp4` |
 | **The `PEER_HCA_RANK*` wiring map** | derivable — three steps are written in `.env.tp4.example`; verify with `./start-tp4.sh ncclcheck` |
-| **A watchdog / self-heal process** | **not shipped.** The published copy of the monitor is `[RETIRED-20260920]`, never wired, and does not even pass `bash -n`; the production unit is a site object. See [`docs/4DGX-DSV41-Flash-部署方案-20260911.md`](docs/4DGX-DSV41-Flash-部署方案-20260911.md) Phase 3 |
+| **A watchdog / self-heal process** | **not shipped, and the one you might find is a trap.** `scripts/systemd/dsv41-head-monitor.service` *is* in this repository and its first line reads as an install instruction — but its `ExecStart` launches `scripts/dsv41-monitor-head.sh`, which self-declares `[RETIRED-20260920]`, was never wired, and does not even pass `bash -n` (line 33 puts the placeholders `<WIP_R1> <WIP_R2> <WIP_R3>` in command position). The unit is `Restart=always`, so installing it yields a permanent restart loop. **Do not install it.** The production self-heal is a site object (systemd user units `dsv41-serve.service` + `oom-gate-monitor`). See [`docs/4DGX-DSV41-Flash-部署方案-20260911.md`](docs/4DGX-DSV41-Flash-部署方案-20260911.md) Phase 3 |
 | **A gateway / concurrency proxy** | the `gateway/` tree is source, not a service — you provide the unit that runs it |
 | **The model's own checkpoint layout** (`/models/DeepSeek-V4.1-Flash` in-image path) | see [`BUILD-IDENTITY.md`](BUILD-IDENTITY.md) |
 
@@ -643,7 +646,7 @@ Upstream lineage is credited below and in [BUILD-IDENTITY.md](BUILD-IDENTITY.md)
 |---|---|---|
 | SGLang serving recipe (boot, adapters, Engram row store, DSpark setup) | [`ntxf31415/DeepSeek-v4.1-Flash-DGX-Sparks`](https://github.com/ntxf31415/DeepSeek-v4.1-Flash-DGX-Sparks) (also published as `MiaAI-Lab/DeepSeek-v4.1-Flash-DGX-Sparks`) | AGPL-3.0-or-later |
 | Recipe lineage / benchmark methodology | [`0xSero/deepseek-v4.1-flash-4x-rtx-pro-6000`](https://github.com/0xSero/deepseek-v4.1-flash-4x-rtx-pro-6000) | MIT |
-| Host ring-only NCCL 2.30.7 build + `libncclpin` core-pinning shim (host-side, not shipped) | [`luxingcom/aicad-nccl-optimization`](https://github.com/luxingcom/aicad-nccl-optimization) (LuZ lineage) | **no license declared** |
+| Host ring-only NCCL 2.30.7 build + `libncclpin` core-pinning shim (host-side, not shipped) | [`luxingcom/aicad-nccl-optimization`](https://github.com/luxingcom/aicad-nccl-optimization) (LuZ lineage) | **Apache-2.0** ([`LICENSE`](https://github.com/luxingcom/aicad-nccl-optimization/blob/main/LICENSE), added 2026-09-20) |
 | Model weights | `deepseek-ai/DeepSeek-V4.1-Flash` (Hugging Face) | see model card |
 
 **Sister projects:** [DeepSeek-V4-Flash-Vision-Exp TP4 switchless-ring](https://github.com/ntxf31415/deepseek-v4-vision-exp-dgxspark-tp4-switchless-ring) (vLLM, same ring base) · [GLM-5.3-Flash NVFP4 TP4 switchless-ring](https://github.com/ntxf31415/glm-5.3-flash-nvfp4-4x-dgx-spark-switchless) (companion recipe).
